@@ -12,7 +12,7 @@
 nvidia-smi
 ```
 顯示這台 PC 的 GPU 相關資料，可判斷安裝 CUDA Toolkit 的相容版本。
-> 以下圖為例，外部顯卡型號是 GeForece RTX 3060，CUDA 版本是 12.7，表示 NVIDIA 顯示卡驅動能夠最高支援 CUDA Runtime 12.7。
+> 以下圖為例，外部顯卡型號是 GeForece RTX 3060，CUDA 版本是 12.7，表示 NVIDIA 顯示卡驅動能夠最高支援 CUDA Runtime 12.7。<br>
 ![set_gpu_01-1](docs/images/set_gpu_01-1.png)
 
 > GPU 驅動程式版本 565.90。`nvidia-smi` 無法正常顯示的話，可能是沒安裝好 GPU Driver。官網：https://www.nvidia.com/zh-tw/geforce/drivers/ 。
@@ -23,7 +23,7 @@ nvidia-smi
 nvcc --version
 ```
 顯示 CUDA 編譯器版本。
-> 以下圖為例，CUDA 編譯器版本
+> 以下圖為例，CUDA 編譯器版本。<br>
 ![set_gpu_01-2](docs/images/set_gpu_01-2.png)
 
 ## 步驟 2. 下載並安裝 CUDA Toolkit
@@ -32,21 +32,21 @@ nvcc --version
 1. 前往 NVIDIA 官方下載頁面：https://developer.nvidia.com/cuda-toolkit-archive
     ![set_gpu_02](docs/images/set_gpu_02.png)
 
-2. 點擊合適的 Toolkit 版本，選擇作業系統 (如 Windows)、系統架構 (x86_64)、版本 (Win11)、安裝類型 (exe(local))。
-    ![set_gpu_03](docs/images/set_gpu_03.png)
-3. 下載後執行 `cuda_12.6.3_561.17_windows.exe`，初次安裝會自動產生 `C:\Program Files\Nvidia GPU Computing Toolkit\*`、`C:\Program Files\NVIDIA Corporation\*` 兩個目錄。
-    ![set_gpu_04-1](docs/images/set_gpu_04-1.png)
-    ![set_gpu_04-2](docs/images/set_gpu_04-2.png)
-    ![set_gpu_04-3](docs/images/set_gpu_04-3.png)
-    ![set_gpu_04-4](docs/images/set_gpu_04-4.png)
-    ![set_gpu_04-5](docs/images/set_gpu_04-5.png)
+2. 點擊合適的 Toolkit 版本，選擇作業系統 (如 Windows)、系統架構 (x86_64)、版本 (Win11)、安裝類型 (exe(local))。<br>
+    ![set_gpu_03](docs/images/set_gpu_03.png)<br>
+3. 下載後執行 `cuda_12.6.3_561.17_windows.exe`，初次安裝會自動產生 `C:\Program Files\Nvidia GPU Computing Toolkit\*`、`C:\Program Files\NVIDIA Corporation\*` 兩個目錄。<br>
+    ![set_gpu_04-1](docs/images/set_gpu_04-1.png)<br>
+    ![set_gpu_04-2](docs/images/set_gpu_04-2.png)<br>
+    ![set_gpu_04-3](docs/images/set_gpu_04-3.png)<br>
+    ![set_gpu_04-4](docs/images/set_gpu_04-4.png)<br>
+    ![set_gpu_04-5](docs/images/set_gpu_04-5.png)<br>
 
-4. 檢查環境變數，通常會自動加入 `CUDA_PATH`、`CUDA_PATH_V12_6` 都指向 `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6`。(設置完畢，要重啟開機)
-    ![set_gpu_05-1](docs/images/set_gpu_05-1.png)
-    ![set_gpu_05-2](docs/images/set_gpu_05-2.png)
+4. 檢查環境變數，通常會自動加入 `CUDA_PATH`、`CUDA_PATH_V12_6` 都指向 `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6`。(設置完畢，要重啟開機)<br>
+    ![set_gpu_05-1](docs/images/set_gpu_05-1.png)<br>
+    ![set_gpu_05-2](docs/images/set_gpu_05-2.png)<br>
 
-> 注意！如果安裝了錯誤或不相容的版本，可到「應用程式」解除安裝，並刪除此 Toolkit 版本的環境變數。
-    ![set_gpu_50](docs/images/set_gpu_50.png)
+> 注意！如果安裝了錯誤或不相容的版本，可到「應用程式」解除安裝，並刪除此 Toolkit 版本的環境變數。<br>
+> ![set_gpu_50](docs/images/set_gpu_50.png)
 
 ## 步驟 3. 下載並安裝 cuDNN
 > 選擇 cuDNN 時，要對應的是「已安裝 CUDA Toolkit 版本」，不是看 `nvidia-smi` 顯示的 CUDA 版本。
@@ -60,9 +60,9 @@ nvcc --version
     >![set_gpu_06-1](docs/images/set_gpu_06-1.png)<br>
     >![set_gpu_06-2](docs/images/set_gpu_06-2.png)
 
-3. 複製檔案是從 zip 解壓縮的 cuDNN  `cudnn-windows-x86_64-9.17.1.4_cuda12-archive.zip` 中取得，共有 3 個目錄 + 1 個檔案，手動覆蓋到對應的 CUDA 目錄：
-    ![set_gpu_07-1](docs/images/set_gpu_07-1.png)
-    ![set_gpu_07-2](docs/images/set_gpu_07-2.png)
+3. 複製檔案是從 zip 解壓縮的 cuDNN  `cudnn-windows-x86_64-9.17.1.4_cuda12-archive.zip` 中取得，共有 3 個目錄 + 1 個檔案，手動覆蓋到對應的 CUDA 目錄：<br>
+    ![set_gpu_07-1](docs/images/set_gpu_07-1.png)<br>
+    ![set_gpu_07-2](docs/images/set_gpu_07-2.png)<br>
 
 - `bin\cudnn*.dll` → `C:\Program Files\Nvidia GPU Computing Toolkit\CUDA\vXX.X\bin\`
 - `include\cudnn*.h` → `C:\Program Files\Nvidia GPU Computing Toolkit\CUDA\vXX.X\include\`
