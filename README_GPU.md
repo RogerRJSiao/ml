@@ -83,9 +83,32 @@ nvcc --version
     where cudnn64_9.dll
     ```
 
-> 其他檢查：
-> - 可用 import torch，torch.backends.cudnn.enabled、torch.backends.cudnn.version()。
-> - 嘗試 import tensorflow as tf，取得 tf.config.list_physical_devices('GPU')。
+### 檢查 3. 執行 py 腳本驗證 GPU 是否運作？
+1. 安裝 Anaconda，建立並啟動 env。
+2. 下載 PyTorch 套件。
+    > 注意！**安裝 PyTorch GPU 版本時，必須依官方支援的 CUDA 版本為準，而不是看已安裝 CUDA Toolkit 版本。** 由於 PyTorch 2.1 官方提供的是 CUDA 12.1 / 12.2 已編譯套件版本 (wheel、conda package)，故這邊指定 pytorch-cuda=12.1 作為穩定版本，而非 12.6。
+    ```
+    (ttst) D:\YOLO_envs\ttst> conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+    ```
+3. 建立 .py 腳本，並在 VSCode 嘗試執行 code。
+    ```
+    import torch
+
+    # 查看 CUDA 是否可用
+    print(torch.cuda.is_available())
+
+    # 查看 GPU 名稱
+    if torch.cuda.is_available():
+        print(torch.__version__)                # PyTorch 版本
+        print(torch.version.cuda)               # CUDA 版本
+        print(torch.backends.cudnn.version())   # cuDNN 版本
+        print(torch.cuda.is_available())        # 是否可以用 GPU
+        print(torch.cuda.get_device_name(0))    # GPU 名稱
+    ```
+    ![set_gpu_10](docs/images/set_gpu_10.png)<br>
+
+> 
+> 若是採用 tf 的專案，也可嘗試：import tensorflow as tf，取得 tf.config.list_physical_devices('GPU')。
 
 ## 閱讀資源
 - NVIDIA cuDNN Installation Guide：https://docs.nvidia.com/deeplearning/cudnn/installation/latest/
