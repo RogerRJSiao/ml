@@ -1,7 +1,8 @@
 """
 檔案處理服務
-負責上下載檔案的業務邏輯處理
+負責上傳、下載檔案的業務邏輯處理
 """
+from pathlib import Path
 from fastapi import UploadFile, HTTPException
 from app.utils.file_utils import FileConfig, FileValidator
 
@@ -18,7 +19,7 @@ class FileProcessService:
         """
         #--初始化回傳結果
         res = {}
-        
+
         #--驗證副檔名是否允許
         is_valid, msg = FileValidator.validate_extension(file.filename)
         if not is_valid:
@@ -36,9 +37,8 @@ class FileProcessService:
         #--只能在async def函數內使用await，await到讀取完成
         content = await file.read()
 
-        #--確保整理(上載)、標註(下載)目錄存在
+        #--確保整理(上載)目錄存在
         FileConfig.get_organized_dir()
-        # FileConfig.get_annotated_dir()
 
         #--建立整理用的檔案路徑，並在新檔名加上時戳
         uploaded = FileConfig()
@@ -75,3 +75,36 @@ class FileProcessService:
                 "msg": msg
             }
             return res    
+
+    @staticmethod
+    async def download_annotated_image(filename: str) -> dict:
+        """
+        下載標註後的圖片
+        Args:       filename (str) 標註圖片的檔案名稱 (例如: tag_20260117_215633_8710.jpg) 
+        Returns:    res (dict) 下載狀態、檔案路徑、訊息
+        """
+        #--初始化回傳結果
+        res = {}
+
+        #--確保標註(下載)目錄存在
+        FileConfig.get_annotated_dir()
+
+        #--檢查用的檔案路徑，並在新檔名加上時戳
+        annotated = FileConfig()
+        if not annotated.change_filename_with_timestamp(filename, "to_annotated"):
+            msg = "下載圖檔--命名不成功"
+            res = {
+                "status": "error",
+                "data": annotated,
+                "msg": msg
+            }
+        else:
+            #--檔案檢查成功
+            msg = "下載圖檔--檔案存在"
+            res = {
+                "status": "success",
+                "data": annotated,
+                "msg": msg
+            }
+        return res
+    

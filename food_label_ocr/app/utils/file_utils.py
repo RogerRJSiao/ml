@@ -65,6 +65,14 @@ class FileConfig:
         
         elif process == "to_annotated":
             #--儲存標註圖檔用
+            #--存取原始檔名，並檢查檔案是否已實際存入
+            self.filename_original = filename
+            filepath = self.__class__.ANNOTATED_DIR / filename
+            if Path(filepath).exists():
+                #--圖檔已存在，取出時間戳
+                basename = filename.rsplit(".", 1)[0]           #--去掉 .jpg
+                self.timestamp_str = basename.split("_", 1)[1]  #--去掉 tag_
+                self.filepath_organized = self.__class__.ORGANIZED_DIR / f"up_{self.timestamp_str}{ext}"
             if not self.timestamp_str:
                 return False
             self.filepath_annotated = self.__class__.ANNOTATED_DIR / f"tag_{self.timestamp_str}{ext}"
