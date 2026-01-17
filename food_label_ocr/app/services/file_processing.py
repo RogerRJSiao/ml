@@ -16,14 +16,17 @@ class FileProcessService:
         Returns:    res (dict) 上載狀態、檔名、完整路徑、訊息
         # Raises:     HTTPException 當檔案驗證失敗時拋出
         """
+        #--初始化回傳結果
+        res = {}
+        
         #--驗證副檔名是否允許
         is_valid, msg = FileValidator.validate_extension(file.filename)
         if not is_valid:
             # raise HTTPException(status_code=400, detail=msg)
             res = {
                 "status": "error",
-                "file": "",
-                "message": msg
+                "data": "",
+                "msg": msg
             }
             return res
         
@@ -35,7 +38,7 @@ class FileProcessService:
 
         #--確保整理(上載)、標註(下載)目錄存在
         FileConfig.get_organized_dir()
-        FileConfig.get_annotated_dir()
+        # FileConfig.get_annotated_dir()
 
         #--建立整理用的檔案路徑，並在新檔名加上時戳
         uploaded = FileConfig()
@@ -43,8 +46,8 @@ class FileProcessService:
             msg = "整理圖檔--命名不成功"
             res = {
                 "status": "error",
-                "file": "",
-                "message": msg
+                "data": "",
+                "msg": msg
             }
             return res
         
@@ -60,7 +63,7 @@ class FileProcessService:
             msg = "整理圖檔--上傳成功"
             res = {
                 "status": "success",
-                "file": uploaded,       #--回傳FileConfig實例，self的所有屬性(變數)皆可調用
+                "data": uploaded,       #--回傳FileConfig實例，self的所有屬性(變數)皆可調用
                 "msg": msg
             }
             return res
@@ -68,7 +71,7 @@ class FileProcessService:
             msg = "整理圖檔--上傳不成功"
             res = {
                 "status": "error",
-                "file": "",
-                "message": msg
+                "data": "",
+                "msg": msg
             }
             return res    
