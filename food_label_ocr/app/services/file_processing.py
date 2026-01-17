@@ -89,6 +89,17 @@ class FileProcessService:
         #--確保標註(下載)目錄存在
         FileConfig.get_annotated_dir()
 
+        #--檢查檔案是否存在
+        filepath = FileConfig.ANNOTATED_DIR / filename
+        if not filepath.exists():
+            msg = "下載圖檔--檔案不存在"
+            res = {
+                "status": "error",
+                "data": "",
+                "msg": msg
+            }
+            return res
+
         #--檢查用的檔案路徑，並在新檔名加上時戳
         annotated = FileConfig()
         if not annotated.change_filename_with_timestamp(filename, "to_annotated"):
