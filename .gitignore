@@ -1,0 +1,9 @@
+ml_yolo/*
+food_label_ocr/uploads/*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
