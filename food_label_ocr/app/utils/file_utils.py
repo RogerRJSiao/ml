@@ -37,14 +37,10 @@ class FileConfig:
 
     def change_filename_with_timestamp(self, filename: str, process: str) -> bool:
         """
-        根據當前時間戳修改檔案名稱
-        
-        Args:
-            filename (str): 原始檔案名稱
-            process (str): 處理類型 ('to_organized' 或 'to_annotate')
-            
-        Returns:
-            bool: 成功返回 True，失敗返回 False
+        根據當前時間戳印/比對實際檔案是否存在，再修改檔案名稱
+        Args:       filename (str): 檔名+副檔名
+                    process (str): 處理類型
+        Returns:    (bool) 成功返回 True，失敗返回 False
         """
         #--取得預計要改前的路徑、副檔名
         # filename = os.path.basename(filepath) #--只取檔名+副檔名部分
@@ -55,9 +51,14 @@ class FileConfig:
 
         #--組合新檔名
         if process == "to_organized":
-            #--存取原始檔名
-            self.filename_original = filename            
             #--儲存原始圖檔用
+            #--存取原始檔名，並檢查檔案是否已實際存入
+            self.filename_original = filename
+            filepath = self.__class__.ORGANIZED_DIR / filename
+            if Path(filepath).exists():
+                #--圖檔已存在，取出時間戳
+                basename = filename.rsplit(".", 1)[0]           #--去掉 .jpg
+                self.timestamp_str = basename.split("_", 1)[1]  #--去掉 up_
             if not self.timestamp_str:
                 self.set_timestamp_str()
             self.filepath_organized = self.__class__.ORGANIZED_DIR / f"up_{self.timestamp_str}{ext}"
