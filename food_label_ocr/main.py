@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.api.routes import router  # 引入 API 路由
 from app.api.routes2 import router2  # 引入 API 路由
 
@@ -19,7 +20,8 @@ app.include_router(router2, prefix="/api/v2")
 
 @app.get("/")
 async def root():
-    return {"message": "歡迎使用食品標示 OCR 分析系統！"}
+    # return {"message": "歡迎使用食品標示 OCR 分析系統！"}
+    return FileResponse("static/index.html")
 
 if __name__ == "__main__":
     #--使用uvicorn main:app前啟動即可，不必在腳本一開始就import uvicorn

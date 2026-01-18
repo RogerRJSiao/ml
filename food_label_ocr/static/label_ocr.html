@@ -1,0 +1,178 @@
+<!--
+原始 Prompt：
+能否幫我延伸這個，寫一個網頁UI放在label_ocr.html，使用/api/v1的方法調用API功能：有1個選取本地檔案的欄位，1個確認按鈕「上傳」觸發/ocr，儲存到organized，等有實際檔案產出到annotated回傳filename，再顯示另一個按鈕「下載」，點擊下載可以再觸發/download/annotated/{filename}。
+能否幫我再加上，上傳圖檔的即時顯示在<label>2. 執行分析</label>，以及標註圖片的即時顯示<label>3. 下載結果</label>
+
+Vibe Coding 實作步驟：
+1. 建立網頁 UI：包含檔案選取 (input type="file") 與確認按鈕。
+2. 串接 API：點擊按鈕後，透過 JS Fetch API 呼叫後端 `/api/v1/ocr`。
+3. 處理流程：
+   - 上傳圖片至後端 `organized` 資料夾。
+   - 等待後端 OCR 處理完成並產出至 `annotated` 資料夾。
+   - 解析後端回傳 JSON，取得產出的檔名 (去除路徑)。
+4. 結果呈現：
+   - 顯示「下載」按鈕，連結指向 `/api/v1/download/annotated/{filename}`。
+   - 實作圖片預覽：選檔時即時預覽原始圖，分析完成後顯示標註結果圖。
+-->
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食品標示 OCR 分析系統</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+        .container { border: 1px solid #ddd; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        
+        button { 
+            background-color: #007bff; color: white; border: none; padding: 10px 20px; 
+            border-radius: 4px; cursor: pointer; font-size: 1rem; 
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        #downloadSection { display: none; margin-top: 2rem; padding: 1rem; background-color: #f8f9fa; border-radius: 4px; border-left: 5px solid #28a745; }
+        #status { margin-top: 1rem; font-weight: bold; }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+        .loading { color: #007bff; }
+        .preview-img { max-width: 100%; max-height: 300px; margin: 10px 0; display: none; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>食品標示 OCR 分析</h1>
+        
+        <div class="form-group">
+            <label for="fileInput">1. 選取本地檔案 (限圖檔)</label>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div class="form-group">
+            <label>2. 執行分析</label>
+            <img id="sourcePreview" class="preview-img" alt="預覽上傳圖片">
+            <button id="uploadBtn" onclick="handleUpload()">上傳 / 開始分析</button>
+            <div id="status"></div>
+        </div>
+        
+        <div id="downloadSection">
+            <label>3. 下載結果</label>
+            <p>分析完成！檔案已儲存至 annotated 資料夾。</p>
+            <img id="resultPreview" class="preview-img" alt="預覽標註圖片">
+            <!-- 下載按鈕連結將由 JS 動態生成 -->
+            <a id="downloadLink" href="#" target="_blank">
+                <button style="background-color: #28a745;">下載標註圖片</button>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // 監聽檔案選取以顯示預覽
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('sourcePreview');
+            if (file) {
+                preview.src = URL.createObjectURL(file);
+                preview.style.display = 'block';
+            } else {
+                preview.src = '';
+                preview.style.display = 'none';
+            }
+        });
+
+        async function handleUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('status');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const downloadSection = document.getElementById('downloadSection');
+            const downloadLink = document.getElementById('downloadLink');
+            const resultPreview = document.getElementById('resultPreview');
+
+            // 重置狀態
+            statusDiv.textContent = "";
+            statusDiv.className = "";
+            downloadSection.style.display = "none";
+
+            if (!fileInput.files[0]) {
+                statusDiv.textContent = "請先選取一個檔案！";
+                statusDiv.className = "error";
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // UI 設為處理中
+            uploadBtn.disabled = true;
+            statusDiv.textContent = "上傳中並等待 OCR 處理 (儲存至 organized -> 產出至 annotated)...";
+            statusDiv.className = "loading";
+
+            try {
+                // 調用 API v1
+                const response = await fetch('/api/v1/ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("API Response:", result);
+
+                if (result.status === 'error') {
+                    throw new Error(result.message || "未知錯誤");
+                }
+
+                // 成功處理
+                statusDiv.textContent = "分析成功！";
+                statusDiv.className = "success";
+
+                // 解析回傳的 filename
+                // 假設後端回傳結構包含 data.filename (例如: {status: "success", data: {filename: "tag_xxx.jpg"}})
+                // 若結構不同，請依據實際 routes.py 的 OCRProcessService 回傳格式調整此處
+                let filename = null;
+                let rawPath = null;
+                if (result.data && result.data.annotated_path) {
+                    rawPath = result.data.annotated_path;
+                } else if (result.filename) {
+                    rawPath = result.filename;
+                }
+                
+                // 確保只取得檔名，去除路徑 (處理 / 或 \)
+                if (rawPath) {
+                    filename = rawPath.split(/[\\/]/).pop();
+                }
+                console.log("Extracted filename:", filename);
+
+                if (filename) {
+                    // 設定下載連結: /api/v1/download/annotated/{filename}
+                    const fileUrl = `/api/v1/download/annotated/${filename}`;
+                    downloadLink.href = fileUrl;
+                    
+                    // 設定結果預覽
+                    resultPreview.src = fileUrl;
+                    resultPreview.style.display = 'block';
+                    
+                    downloadSection.style.display = "block";
+                } else {
+                    statusDiv.textContent = "分析成功，但無法從回應中取得檔名。請檢查 Console。";
+                    statusDiv.className = "error";
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = "發生錯誤: " + error.message;
+                statusDiv.className = "error";
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
