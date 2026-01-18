@@ -2,6 +2,7 @@
 原始 Prompt：
 能否幫我延伸這個，寫一個網頁UI放在label_ocr.html，使用/api/v1的方法調用API功能：有1個選取本地檔案的欄位，1個確認按鈕「上傳」觸發/ocr，儲存到organized，等有實際檔案產出到annotated回傳filename，再顯示另一個按鈕「下載」，點擊下載可以再觸發/download/annotated/{filename}。
 能否幫我再加上，上傳圖檔的即時顯示在<label>2. 執行分析</label>，以及標註圖片的即時顯示<label>3. 下載結果</label>
+請在<h1>食品標示 OCR 分析</h1>附近加上一個「重新選取」的按鈕，點擊後要清掉 已選的「選取本地檔案」，同時讓<img id="sourcePreview"> 和<label>3. 下載結果</label>不顯示
 
 Vibe Coding 實作步驟：
 1. 建立網頁 UI：包含檔案選取 (input type="file") 與確認按鈕。
@@ -13,6 +14,9 @@ Vibe Coding 實作步驟：
 4. 結果呈現：
    - 顯示「下載」按鈕，連結指向 `/api/v1/download/annotated/{filename}`。
    - 實作圖片預覽：選檔時即時預覽原始圖，分析完成後顯示標註結果圖。
+5. UI 優化：
+   - 新增「重新選取」按鈕於標題旁。
+   - 實作 `resetForm()`：清空檔案輸入、隱藏預覽圖與下載區塊，重置狀態。
 -->
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -44,7 +48,10 @@ Vibe Coding 實作步驟：
 </head>
 <body>
     <div class="container">
-        <h1>食品標示 OCR 分析</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 1.5rem;">
+            <h1 style="border-bottom: none; padding-bottom: 0; margin: 0;">食品標示 OCR 分析</h1>
+            <button onclick="resetForm()" style="background-color: #6c757d; padding: 8px 15px; font-size: 0.9rem;">重新選取</button>
+        </div>
         
         <div class="form-group">
             <label for="fileInput">1. 選取本地檔案 (限圖檔)</label>
@@ -172,6 +179,20 @@ Vibe Coding 實作步驟：
             } finally {
                 uploadBtn.disabled = false;
             }
+        }
+
+        function resetForm() {
+            document.getElementById('fileInput').value = '';
+            
+            const sourcePreview = document.getElementById('sourcePreview');
+            sourcePreview.src = '';
+            sourcePreview.style.display = 'none';
+            
+            document.getElementById('downloadSection').style.display = 'none';
+            
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = '';
+            statusDiv.className = '';
         }
     </script>
 </body>
