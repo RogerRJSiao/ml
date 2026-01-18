@@ -3,7 +3,10 @@ from fastapi.responses import FileResponse
 from app.services.file_processing import FileProcessService
 from app.services.ocr_processing import OCRProcessService
 
-router = APIRouter(prefix="/api")
+#--建立API路由
+#--routes只處理相對路徑，不處理完整URL(改由main.py掛載)
+#--加入tags群組名稱有助於API文件分類
+router = APIRouter(tags=["OCR Analysis"])
 
 @router.post("/ocr")
 async def ocr(file: UploadFile = File(...)):

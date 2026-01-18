@@ -13,7 +13,7 @@ app = FastAPI(
 #--掛載靜態文件目錄
 app.mount("/static", StaticFiles(directory="static"), name="static")
 #--啟用API路由
-app.include_router(router)
+app.include_router(router, prefix="/api")
 
 @app.get("/")
 async def root():
