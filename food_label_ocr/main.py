@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import router  # 引入 API 路由
+from app.api.routes2 import router2  # 引入 API 路由
 
 #--建立FastAPI應用
 #--查看自動產生的API文件：http://127.0.0.1:8000/docs#/
@@ -13,7 +14,8 @@ app = FastAPI(
 #--掛載靜態文件目錄
 app.mount("/static", StaticFiles(directory="static"), name="static")
 #--啟用API路由
-app.include_router(router, prefix="/api")
+app.include_router(router, prefix="/api/v1")
+app.include_router(router2, prefix="/api/v2")
 
 @app.get("/")
 async def root():
