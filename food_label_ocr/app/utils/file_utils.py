@@ -82,6 +82,15 @@ class FileConfig:
             
         return True
     
+    def to_dict(self) -> dict:
+        """將實例序列化為 dict，用於 API 回應，有助於前端介接"""
+        return {
+            "timestamp_str": self.timestamp_str,
+            "filename_original": self.filename_original,
+            "filepath_organized": str(self.filepath_organized) if self.filepath_organized else None,
+            "filepath_annotated": str(self.filepath_annotated) if self.filepath_annotated else None
+        }
+    
     @classmethod
     def get_organized_dir(cls) -> Path:
         """確認或建立原始圖片目錄"""

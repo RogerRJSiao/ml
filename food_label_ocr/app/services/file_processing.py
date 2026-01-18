@@ -26,7 +26,7 @@ class FileProcessService:
             # raise HTTPException(status_code=400, detail=msg)
             res = {
                 "status": "error",
-                "data": "",
+                "data": FileConfig().to_dict(),
                 "msg": msg
             }
             return res
@@ -46,7 +46,7 @@ class FileProcessService:
             msg = "整理圖檔--命名不成功"
             res = {
                 "status": "error",
-                "data": "",
+                "data": uploaded.to_dict(),
                 "msg": msg
             }
             return res
@@ -63,7 +63,7 @@ class FileProcessService:
             msg = "整理圖檔--上傳成功"
             res = {
                 "status": "success",
-                "data": uploaded,       #--回傳FileConfig實例，self的所有屬性(變數)皆可調用
+                "data": uploaded.to_dict(),
                 "msg": msg
             }
             return res
@@ -71,7 +71,7 @@ class FileProcessService:
             msg = "整理圖檔--上傳不成功"
             res = {
                 "status": "error",
-                "data": "",
+                "data": uploaded.to_dict(),
                 "msg": msg
             }
             return res    
@@ -95,7 +95,7 @@ class FileProcessService:
             msg = "下載圖檔--檔案不存在"
             res = {
                 "status": "error",
-                "data": "",
+                "data": FileConfig().to_dict(),
                 "msg": msg
             }
             return res
@@ -106,7 +106,7 @@ class FileProcessService:
             msg = "下載圖檔--命名不成功"
             res = {
                 "status": "error",
-                "data": annotated,
+                "data": annotated.to_dict(),
                 "msg": msg
             }
         else:
@@ -114,7 +114,7 @@ class FileProcessService:
             msg = "下載圖檔--檔案存在"
             res = {
                 "status": "success",
-                "data": annotated,
+                "data": annotated.to_dict(),
                 "msg": msg
             }
         return res

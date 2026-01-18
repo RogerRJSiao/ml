@@ -35,7 +35,7 @@ class OCRProcessService:
             msg = "原圖不存在，無法進行OCR讀圖處理"
             res = {
                 "status": "error",
-                "data": "",
+                "data": FileConfig().to_dict(),
                 "msg": msg
             }
             return res
@@ -50,7 +50,7 @@ class OCRProcessService:
             msg = "讀取圖檔--命名不成功"
             res = {
                 "status": "error",
-                "data": annotated,
+                "data": annotated.to_dict(),
                 "msg": msg
             }
             return res
@@ -58,7 +58,7 @@ class OCRProcessService:
             msg = "標註圖檔--命名不成功"
             res = {
                 "status": "error",
-                "data": annotated,
+                "data": annotated.to_dict(),
                 "msg": msg
             }
             return res

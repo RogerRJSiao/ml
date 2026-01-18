@@ -17,7 +17,7 @@ async def ocr(file: UploadFile = File(...)):
         return result_upload
     
     #--取得已上傳的檔案配置，並進行OCR處理(現為模擬)
-    filepath_upload = result_upload["data"].filepath_organized
+    filepath_upload = result_upload["data"]["filepath_organized"]
     result_ocr = await OCRProcessService.process_ocr(filepath_upload)
     return result_ocr
 
@@ -33,7 +33,7 @@ async def download_annotated(filename: str):
     if result_download["status"] == "error":
         return result_download
     return FileResponse(
-        path=result_download["data"].filepath_annotated,
+        path=result_download["data"]["filepath_annotated"],
         media_type="image/jpeg",
         filename=filename
     )
