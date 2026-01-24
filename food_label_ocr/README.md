@@ -13,7 +13,7 @@
 
 ## 3. 專案檔案夾結構 📂
 ```
-food_label_ocr/
+food_ocr/
 ├── main.py                     #--FastAPI 入口
 ├── requirements.txt            #--Python 套件列表
 ├── uploads/                    #--圖檔儲存
@@ -57,17 +57,27 @@ food_label_ocr/
 1. 開啟 Anaconda Prompt，建立並啟動新的 python 虛擬環境。
     ```
     (base) C:\Users\User>cd /d D:\your-project
-    (base) D:\your-project>mkdir food_label_ocr
-    (base) D:\your-project>cd food_label_ocr
-    (base) D:\your-project\food_label_ocr>conda create --name food_label_ocr python=3.11.8
-    (base) D:\your-project\food_label_ocr>conda activate food_label_ocr
-    (food_label_ocr) D:\your-project\food_label_ocr>
+    (base) D:\your-project>mkdir food_ocr
+    (base) D:\your-project>cd food_ocr
+    (base) D:\your-project\food_ocr>conda create --name food_ocr python=3.11.8
+    (base) D:\your-project\food_ocr>conda activate food_ocr
+    (food_ocr) D:\your-project\food_ocr>
     ```
 
-2. 安裝本專案必要套件/模組。(請確認 VSCode 開啟 .py 時，右下角虛擬環境是在 `python 3.11.8 food_label_ocr`)
+2. 安裝本專案必要套件/模組。
+    - 要點1：請確認 VSCode 開啟 .py 時，右下角虛擬環境是在 `python 3.11.8 food_ocr`。
+    - 要點2：`OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized.` 是出現在 pip 和 conda 混裝套件的情形，讓專案環境的 libiomp5md 重複儲存。故建議全程都用 conda 指令安裝，可不需要以 PS 重設環境變數 
+        - 底層 binary 管理系統 runtime：CUDA / C++ / MKL / OpenMP / .dll / .so / .dylib
+        - 上層 python 處理純 python 套件：Web / API / framework
+    
     ``` Anaconda Prompt
-    (food_label_ocr) D:\your-project\food_label_ocr>pip install -U fastapi uvicorn[standard]
-    (food_label_ocr) D:\your-project\food_label_ocr>pip install python-multipart
+    #--根據CUDA版本，安裝對應的PyTorch套件
+    (food_ocr) D:\your-project\food_ocr>conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+    (food_ocr) D:\your-project\food_ocr>conda install -c conda-forge opencv numpy
+    #--安裝API套件
+    (food_ocr) D:\your-project\food_ocr>pip install -U fastapi uvicorn[standard] python-multipart
+    #--安裝OCR套件
+    (food_ocr) D:\your-project\food_ocr>pip install easyocr
     ```
     或，用 `pip install -r` 單一指令安裝全部套件。 (to be checked)
     ```
@@ -78,7 +88,7 @@ food_label_ocr/
     ``` Anaconda Prompt
     #--檢查 uvicorn 服務 (以調用 main.py 的 app 實體為例)
     #--注意此腳本已無 import error 等報錯。
-    (food_label_ocr) D:\your-project\food_label_ocr>uvicorn main:app --reload
+    (food_ocr) D:\your-project\food_ocr>uvicorn main:app --reload
     ```
 
 ## 6. 技術新里程 🚀
