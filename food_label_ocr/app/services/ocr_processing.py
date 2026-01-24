@@ -1,12 +1,12 @@
 """
 OCR 處理服務
-負責模擬 OCR 分析圖片的業務邏輯（實際上複製檔案）
+負責OCR分析圖片的業務邏輯，整合EasyOCR工具進行文字偵測
 """
 import shutil
 from pathlib import Path
 from fastapi import HTTPException
 from app.utils.file_utils import FileConfig
-
+from app.utils.ocr_utils import EasyOCRManager
 
 class OCRProcessService:
     """OCR 處理服務類別"""
@@ -39,10 +39,10 @@ class OCRProcessService:
     }
     
     @staticmethod
-    async def process_ocr(filepath: str, language: str = "traditional_chinese", packaging: str = "normal") -> dict:
+    async def process_ocr(filepath: str, language: str = "ch_tra", packaging: str = "normal") -> dict:
         """
-        模擬 OCR 處理流程
-        實際操作：複製原始圖片到 annotated 目錄
+        執行 OCR 處理流程，整合 EasyOCR 進行文字偵測與信心度判斷
+        
         Args:
         - filepath (str): 原始圖檔路徑
         - language (str): 辨識語言代碼 (traditional_chinese/english/japanese)
@@ -67,9 +67,11 @@ class OCRProcessService:
             }
             return res
 
-        #--驗證輸入參數
-        if language not in OCRProcessService.SUPPORTED_LANGUAGES:
-            language = "ch_tra"     #--預設繁體中文
+        #--驗證輸入參數，若不符則使用預設值
+        if language not in OCRProcessService.SUPPORTED_LANGUAGES or language == "ch_tra" :
+            langs_list = ["ch_tra", "en"]  #--預設繁體中文+英文     #--預設繁體中文
+        else:
+            langs_list = [language]
         if packaging not in OCRProcessService.PACKAGING_CONFIG:
             packaging = "normal"    #--預設一般
 
@@ -95,14 +97,40 @@ class OCRProcessService:
                 "msg": msg
             }
             return res
-
-        #--複製檔案(模擬OCR處理完成)
-        shutil.copy2(annotated.filepath_organized, annotated.filepath_annotated)
+      
+        #--執行並存取EasyOCR文字偵測結果
+        ocr_result = EasyOCRManager.detect_text(
+            image_path=str(annotated.filepath_organized),
+            languages=langs_list,
+            packaging_style=packaging,
+            gpu=True  #--預設嘗試使用GPU，如不可用則自動切換成CPU
+        )
         
-        #--獲取包裝樣式的實際配置 (語言代碼直接使用)
+        #--準備OCR回傳內容
+        ocr_content = {}
+        if ocr_result["status"] == "success":
+            processed_results = ocr_result["data"]["processed_results"]
+            
+            #--所有檢測到的文字
+            all_detected_text = EasyOCRManager.get_detected_text(processed_results)
+            
+            ocr_content = {
+                "status": "success",
+                "detected_text": all_detected_text,
+                "total_detections": len(processed_results),
+                "raw_results": processed_results
+            }
+        else:
+            # OCR 偵測失敗，回傳錯誤訊息
+            ocr_content = {
+                "status": "error",
+                "message": ocr_result["message"]
+            }
+
+        #--獲取包裝樣式的實際配置
         packaging_config = OCRProcessService.PACKAGING_CONFIG[packaging]
         
-        #--模擬OCR結果
+        #--組合最終回傳結果
         ocr_result = {
             "status": "success",
             "data": {
@@ -117,18 +145,7 @@ class OCRProcessService:
                         "description": packaging_config["description"]
                     }
                 },
-                "ocr_content": {
-                    "text": "食品標示文字內容（模擬）",
-                    "confidence": 0.95,
-                    "detected_ingredients": ["成分1", "成分2"],
-                    "allergens": ["過敏原1"],
-                    "nutrition": {
-                        "calories": 100,
-                        "protein": 5,
-                        "fat": 3,
-                        "carbs": 15
-                    }
-                }
+                "ocr_content": ocr_content
             },
             "msg": f"OCR 處理完成 (指定語言: {language}, 指定樣式: {packaging})"
         }
