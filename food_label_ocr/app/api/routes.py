@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from app.services.file_processing import FileProcessService
 from app.services.ocr_processing import OCRProcessService
@@ -9,19 +9,27 @@ from app.services.ocr_processing import OCRProcessService
 router = APIRouter(tags=["OCR Analysis"])
 
 @router.post("/ocr")
-async def ocr(file: UploadFile = File(...)):
+async def ocr(
+    file: UploadFile = File(...),
+    language: str = Form(default="ch_tra"),
+    packaging: str = Form(default="normal")
+):
     """
     圖檔OCR上傳+分析端點
-    接收圖檔，透過服務層驗證後，儲存到organized檔案夾，並以OCR分析另存到annotated。
+    接收圖檔與辨識選項，透過服務層驗證後，儲存到organized檔案夾，並以OCR分析另存到annotated。
+    Args:
+    - file: 上傳圖檔
+    - language: 辨識語言 (ch_tra=繁中/en=英文/ja=日文)
+    - packaging: 包裝樣式 (normal=一般/reflective=反光/white_text=白字/auto=自動)
     """
     #--處理上傳檔案
     result_upload = await FileProcessService.process_upload(file)
     if result_upload["status"] == "error":
         return result_upload
     
-    #--取得已上傳的檔案配置，並進行OCR處理(現為模擬)
+    #--取得已上傳的檔案配置，並進行OCR處理
     filepath_upload = result_upload["data"]["filepath_organized"]
-    result_ocr = await OCRProcessService.process_ocr(filepath_upload)
+    result_ocr = await OCRProcessService.process_ocr(filepath_upload, language, packaging)
     return result_ocr
 
 @router.get("/download/annotated/{filename}")

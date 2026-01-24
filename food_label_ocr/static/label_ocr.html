@@ -3,6 +3,9 @@
 能否幫我延伸這個，寫一個網頁UI放在label_ocr.html，使用/api/v1的方法調用API功能：有1個選取本地檔案的欄位，1個確認按鈕「上傳」觸發/ocr，儲存到organized，等有實際檔案產出到annotated回傳filename，再顯示另一個按鈕「下載」，點擊下載可以再觸發/download/annotated/{filename}。
 能否幫我再加上，上傳圖檔的即時顯示在<label>2. 執行分析</label>，以及標註圖片的即時顯示<label>3. 下載結果</label>
 請在<h1>食品標示 OCR 分析</h1>附近加上一個「重新選取」的按鈕，點擊後要清掉 已選的「選取本地檔案」，同時讓<img id="sourcePreview"> 和<label>3. 下載結果</label>不顯示
+請在「選取本地檔案」和「執行分析」之間，再多加上1個步驟。要能讓使用者選取要辨識的：
+- 語言種類 (單選 radio)：繁體中文 (預設)、英文、日文
+- 包裝樣式 (單選 radio)：一般 (建議)、高反光、白色字體、不確定 (自動判斷)
 
 Vibe Coding 實作步驟：
 1. 建立網頁 UI：包含檔案選取 (input type="file") 與確認按鈕。
@@ -17,7 +20,18 @@ Vibe Coding 實作步驟：
 5. UI 優化：
    - 新增「重新選取」按鈕於標題旁。
    - 實作 `resetForm()`：清空檔案輸入、隱藏預覽圖與下載區塊，重置狀態。
+6. 後端參數映射說明：
+- language 參數直接使用 EasyOCR 語言代碼：
+  * ch_tra (繁體中文)
+  * en (英文)
+  * ja (日文)
+- packaging 參數對應 readtext() 的參數調整 (ocr_processing.py 實現)：
+  * normal: text_threshold=0.7, low_text=0.4 (一般標準設定)
+  * reflective: text_threshold=0.5, low_text=0.3 (降低閾值處理反光)
+  * white_text: text_threshold=0.8, low_text=0.5 (提高閾值處理白色文字)
+  * auto: text_threshold=0.65, low_text=0.35 (自動中等設定)
 -->
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -59,14 +73,47 @@ Vibe Coding 實作步驟：
         </div>
 
         <div class="form-group">
-            <label>2. 執行分析</label>
+            <label>2. 選擇辨識選項</label>
+            <div style="margin-left: 1rem;">
+                <div style="margin-bottom: 1rem;">
+                    <p style="margin-top: 0; margin-bottom: 0.5rem; font-weight: normal;">【語言種類】</p>
+                    <label style="display: inline; margin-right: 1.5rem; font-weight: normal;">
+                        <input type="radio" name="language" value="ch_tra" checked> 繁體中文 (預設)
+                    </label>
+                    <label style="display: inline; margin-right: 1.5rem; font-weight: normal;">
+                        <input type="radio" name="language" value="en"> 英文
+                    </label>
+                    <label style="display: inline; font-weight: normal;">
+                        <input type="radio" name="language" value="ja"> 日文
+                    </label>
+                </div>
+                <div>
+                    <p style="margin-top: 0; margin-bottom: 0.5rem; font-weight: normal;">【包裝樣式】</p>
+                    <label style="display: inline; margin-right: 1.5rem; font-weight: normal;">
+                        <input type="radio" name="packaging" value="normal" checked> 一般 (建議)
+                    </label>
+                    <label style="display: inline; margin-right: 1.5rem; font-weight: normal;">
+                        <input type="radio" name="packaging" value="reflective"> 高反光
+                    </label>
+                    <label style="display: inline; margin-right: 1.5rem; font-weight: normal;">
+                        <input type="radio" name="packaging" value="white_text"> 白色字體
+                    </label>
+                    <label style="display: inline; font-weight: normal;">
+                        <input type="radio" name="packaging" value="auto"> 不確定 (自動判斷)
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>3. 執行分析</label>
             <img id="sourcePreview" class="preview-img" alt="預覽上傳圖片">
             <button id="uploadBtn" onclick="handleUpload()">上傳 / 開始分析</button>
             <div id="status"></div>
         </div>
         
         <div id="downloadSection">
-            <label>3. 下載結果</label>
+            <label>4. 下載結果</label>
             <p>分析完成！檔案已儲存至 annotated 資料夾。</p>
             <img id="resultPreview" class="preview-img" alt="預覽標註圖片">
             <!-- 下載按鈕連結將由 JS 動態生成 -->
@@ -110,8 +157,19 @@ Vibe Coding 實作步驟：
             }
 
             const file = fileInput.files[0];
+            
+            // 取得使用者選擇的語言和包裝樣式
+            const selectedLanguage = document.querySelector('input[name="language"]:checked').value;
+            const selectedPackaging = document.querySelector('input[name="packaging"]:checked').value;
+            console.log("Selected Language:", selectedLanguage);
+            console.log("Selected Packaging:", selectedPackaging);
+
             const formData = new FormData();
             formData.append('file', file);
+            // 將語言和包裝樣式參數傳送至後端
+            // 後端會在 routes.py 接收並轉換為 EasyOCR 相容格式
+            formData.append('language', selectedLanguage);
+            formData.append('packaging', selectedPackaging);
 
             // UI 設為處理中
             uploadBtn.disabled = true;

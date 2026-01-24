@@ -11,15 +11,42 @@ from app.utils.file_utils import FileConfig
 class OCRProcessService:
     """OCR 處理服務類別"""
     
+    # 支援的語言代碼 (直接使用 EasyOCR 格式)
+    SUPPORTED_LANGUAGES = ["ch_tra", "en", "ja"]
+    
+    # 包裝樣式映射：前端變數 → readtext 參數配置
+    PACKAGING_CONFIG = {
+        "normal": {
+            "text_threshold": 0.7,
+            "low_text": 0.4,
+            "description": "一般標準設定"
+        },
+        "reflective": {
+            "text_threshold": 0.5,
+            "low_text": 0.3,
+            "description": "降低閾值以處理高反光包裝"
+        },
+        "white_text": {
+            "text_threshold": 0.8,
+            "low_text": 0.5,
+            "description": "提高閾值以處理高對比白色文字"
+        },
+        "auto": {
+            "text_threshold": 0.65,
+            "low_text": 0.35,
+            "description": "自動中等設定"
+        }
+    }
+    
     @staticmethod
-    async def process_ocr(filepath: str) -> dict:
+    async def process_ocr(filepath: str, language: str = "traditional_chinese", packaging: str = "normal") -> dict:
         """
         模擬 OCR 處理流程
         實際操作：複製原始圖片到 annotated 目錄
-        
         Args:
-            file_config (FileConfig): 包含檔案配置的實例
-            
+        - filepath (str): 原始圖檔路徑
+        - language (str): 辨識語言代碼 (traditional_chinese/english/japanese)
+        - packaging (str): 包裝樣式 (normal/reflective/white_text/auto)
         Returns:
             dict: 包含處理狀態、檔案路徑、OCR 結果的字典
         """
@@ -39,6 +66,12 @@ class OCRProcessService:
                 "msg": msg
             }
             return res
+
+        #--驗證輸入參數
+        if language not in OCRProcessService.SUPPORTED_LANGUAGES:
+            language = "ch_tra"     #--預設繁體中文
+        if packaging not in OCRProcessService.PACKAGING_CONFIG:
+            packaging = "normal"    #--預設一般
 
         #--確保整理(上載)、標註(下載)目錄存在
         FileConfig.get_organized_dir()
@@ -66,12 +99,24 @@ class OCRProcessService:
         #--複製檔案(模擬OCR處理完成)
         shutil.copy2(annotated.filepath_organized, annotated.filepath_annotated)
         
+        #--獲取包裝樣式的實際配置 (語言代碼直接使用)
+        packaging_config = OCRProcessService.PACKAGING_CONFIG[packaging]
+        
         #--模擬OCR結果
         ocr_result = {
             "status": "success",
             "data": {
                 "organized_path": str(annotated.filepath_organized),
                 "annotated_path": str(annotated.filepath_annotated),
+                "processing_config": {
+                    "language": language,
+                    "packaging": packaging,
+                    "packaging_config": {
+                        "text_threshold": packaging_config["text_threshold"],
+                        "low_text": packaging_config["low_text"],
+                        "description": packaging_config["description"]
+                    }
+                },
                 "ocr_content": {
                     "text": "食品標示文字內容（模擬）",
                     "confidence": 0.95,
@@ -85,7 +130,7 @@ class OCRProcessService:
                     }
                 }
             },
-            "msg": "OCR 處理完成"
+            "msg": f"OCR 處理完成 (指定語言: {language}, 指定樣式: {packaging})"
         }
         
         return ocr_result
