@@ -109,7 +109,7 @@ class OCRProcessService:
         cropped_result = EasyOCRManager.detect_and_crop_area(
             image_path=str(annotated.filepath_organized),
             saving_dir=str(annotated.dirpath_adjusted),
-            interest_texts="營養標示"
+            interest_texts="標示"
         )
          
         #--執行並存取EasyOCR文字偵測結果

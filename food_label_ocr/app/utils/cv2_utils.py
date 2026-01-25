@@ -5,7 +5,7 @@ OpenCV工具模組
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 class OpenCVManager:
     """OpenCV管理器"""
@@ -102,3 +102,114 @@ class OpenCVManager:
         }
         
         return res
+    
+    @staticmethod
+    def correct_skewed_contour(image: np.ndarray, contour: np.ndarray, padding: int = 5) -> Tuple[np.ndarray, np.ndarray, Dict]:
+        """
+        校正歪斜輪廓，使用透視變換將其平鋪成矩形
+        Args:
+            image: 原始影像
+            contour: 輪廓 (可能歪斜)
+            padding: 邊界padding
+        Returns:
+            (corrected_image, corrected_contour, info_dict): 
+            - corrected_image: 校正後的影像
+            - corrected_contour: 校正後的輪廓 (標準矩形)
+            - info_dict: 包含變換資訊和座標資訊
+        """
+        # 計算輪廓的外接矩形
+        x, y, w, h = cv2.boundingRect(contour)
+        
+        # 使用輪廓逼近取得近似的四邊形頂點
+        epsilon = 0.02 * cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, epsilon, True)
+        
+        # 如果逼近結果不是四邊形，使用外接矩形的四個角
+        if len(approx) != 4:
+            # 取得外接矩形的四個頂點
+            src_points = np.array([
+                [x, y],
+                [x + w, y],
+                [x + w, y + h],
+                [x, y + h]
+            ], dtype=np.float32)
+        else:
+            # 使用逼近的四邊形頂點，並進行排序
+            src_points = approx.reshape(4, 2).astype(np.float32)
+            # 對點進行排序：左上、右上、右下、左上
+            src_points = OpenCVManager._order_points(src_points)
+        
+        # 計算目標矩形的寬高
+        dst_width = int(w)
+        dst_height = int(h)
+        
+        # 定義目標矩形的四個頂點 (標準位置：左上、右上、右下、左下)
+        dst_points = np.array([
+            [0, 0],
+            [dst_width, 0],
+            [dst_width, dst_height],
+            [0, dst_height]
+        ], dtype=np.float32)
+        
+        # 計算透視變換矩陣
+        matrix = cv2.getPerspectiveTransform(src_points, dst_points)
+        
+        # 執行透視變換
+        corrected_image = cv2.warpPerspective(image, matrix, (dst_width, dst_height))
+        
+        # 校正後的輪廓是標準矩形
+        corrected_contour = np.array([
+            [[0, 0]],
+            [[dst_width, 0]],
+            [[dst_width, dst_height]],
+            [[0, dst_height]]
+        ], dtype=np.int32)
+        
+        # 處理邊界和padding
+        h_img, w_img = image.shape[:2]
+        y_start = max(0, y - padding)
+        y_end = min(h_img, y + h + padding)
+        x_start = max(0, x - padding)
+        x_end = min(w_img, x + w + padding)
+        
+        info_dict = {
+            "original_bbox": [x, y, w, h],
+            "bbox_with_padding": [[y_start, x_start], [y_end, x_end]],
+            "src_points": src_points.tolist(),
+            "dst_points": dst_points.tolist(),
+            "perspective_matrix": matrix.tolist(),
+            "corrected_size": (dst_width, dst_height)
+        }
+        
+        return corrected_image, corrected_contour, info_dict
+    
+    @staticmethod
+    def _order_points(points: np.ndarray) -> np.ndarray:
+        """
+        對四邊形頂點進行排序，確保順序為：左上、右上、右下、左下
+        Args:
+            points: 四個頂點座標 (4, 2)
+        Returns:
+            排序後的頂點座標
+        """
+        # 計算四邊形的中心
+        center = points.mean(axis=0)
+        
+        # 計算每個點相對於中心的角度
+        angles = np.arctan2(points[:, 1] - center[1], points[:, 0] - center[0])
+        
+        # 按角度排序
+        sorted_indices = np.argsort(angles)
+        ordered_points = points[sorted_indices]
+        
+        # 確保順序為左上、右上、右下、左下
+        # 計算每個點到左上角(0,0)的距離
+        distances_to_tl = np.sqrt(ordered_points[:, 0]**2 + ordered_points[:, 1]**2)
+        
+        # 找到最接近左上角的點
+        tl_idx = np.argmin(distances_to_tl)
+        
+        # 旋轉數組，使左上角成為第一個
+        ordered_points = np.roll(ordered_points, -tl_idx, axis=0)
+        
+        return ordered_points
