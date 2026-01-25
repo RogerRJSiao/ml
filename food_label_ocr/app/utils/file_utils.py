@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Set, Tuple
 import os
 import time
+import secrets, string
 
 class FileConfig:
     """檔案配置類別 - 管理上傳和標註圖片目錄"""
     #--設定上載、標註的目錄路徑
     UPLOAD_DIR = Path(__file__).parent.parent.parent / "uploads"
     ORGANIZED_DIR = UPLOAD_DIR / "organized"    # 原始圖片
+    ADJUSTED_DIR = UPLOAD_DIR / "adjusted"      # 調整後圖片，後續會有下一層以時戳命名的子目錄
     ANNOTATED_DIR = UPLOAD_DIR / "annotated"    # 標註圖片
 
     def __init__(self):
@@ -19,17 +21,23 @@ class FileConfig:
         self.timestamp_str = ""
         self.filename_original = ""
         self.filepath_organized = ""
+        self.filepath_adjusted = ""
+        self.dirpath_adjusted = ""
         self.filepath_annotated = ""
     
     def set_timestamp_str(self) -> str:
-        """取得當前時間戳字串，格式: YYYYMMDD_HHMMSS_ms"""
+        """取得當前時間戳字串，格式: YYYYMMDD_HHMMSS_"""
         t = time.time()
         local_time = time.localtime(t)
         time_str = time.strftime("%Y%m%d_%H%M%S", local_time)
-        ms = int((t - int(t)) * 10000)
-        
+        #--取得毫秒，必須是3位數
+        ms = int((t - int(t)) * 1000)
+        ms = f"{ms:03d}"
+        #--再加上加密隨機數字(3碼)
+        secure = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(3))
+
         #--組合完整時間戳字串(西元年到毫秒)
-        self.timestamp_str = f"{time_str}_{ms}"
+        self.timestamp_str = f"{time_str}_{ms}{secure}"
         return self.timestamp_str
 
     def change_filename_with_timestamp(self, filename: str, process: str) -> bool:
@@ -95,10 +103,17 @@ class FileConfig:
         return cls.ORGANIZED_DIR
     
     @classmethod
+    def get_adjusted_dir(cls) -> Path:
+        """確認或建立調整後圖片目錄"""
+        cls.ADJUSTED_DIR.mkdir(parents=True, exist_ok=True)
+        return cls.ADJUSTED_DIR
+        
+    @classmethod
     def get_annotated_dir(cls) -> Path:
         """確認或建立標註圖片目錄"""
         cls.ANNOTATED_DIR.mkdir(parents=True, exist_ok=True)
         return cls.ANNOTATED_DIR
+
 
 
 class FileValidator:
