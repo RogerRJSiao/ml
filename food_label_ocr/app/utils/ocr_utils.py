@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import os
 from app.utils.file_utils import FileConfig
+from app.utils.cv2_utils import OpenCVManager
 
 class EasyOCRManager:
     """EasyOCR 管理器 - 負責 OCR 相關操作"""
@@ -237,204 +238,75 @@ class EasyOCRManager:
         return " ".join([r["text"] for r in processed_results])
 
     @staticmethod
-    def detect_and_crop_area(image_path: str, saving_dir: str, interest_texts: str) -> bool:
+    def detect_and_crop_area(image_path: str, saving_dir: str, interest_texts: str = "") -> bool:
         """
-        辨別邊框輪廓後，判斷內部有無指定文字，裁切ROI區域並儲存新圖(OpenCV的AOI)
+        辨別邊框輪廓後，裁切ROI區域並儲存處理過程的圖像
         Args:
             image_path (str): 原始圖片路徑
             saving_dir (str): 裁切後圖片儲存路徑
+            interest_texts (str): 目標文字（用於後續篩選ROI）
         Returns:
-            bool: ROI截圖是否儲存成功
-
-        ##--透過AOI取得矩形方法
-        方法一. 
-        方法二. 轉灰階並模糊化，使用邊緣檢測(Canny)，膨脹邊緣連接斷裂部分，尋找輪廓並選取外框
-        方法三. 使用霍夫變換(Hough Transform)偵測直線，計算交點形成矩形，選取最大矩形區域
+            bool: 處理是否成功
         """
-        #--取得原圖路徑
+        #--驗證輸入參數
         if not Path(image_path).exists():
             print(f"圖片路徑不存在: {image_path}")
             return False
-        ori_image_path = Path(image_path)
-
-        #--設定輸出目錄、檔案名稱
-        img_name = ""
-        img_dict = {"desc": "", "path": "", "data": None}
-        img_group = {}
-
-        #--讀取原圖資料
-        ori_img = cv2.imread(ori_image_path)
-        img = ori_img.copy()
-        cols, rows = img.shape[1], img.shape[0]
-
-        #--儲存原圖
-        img_name, img_dict["desc"] = "img_00", "原始圖檔"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        color = ori_img.copy()
-        cv2.imwrite(img_group[img_name]["path"], color)
-
-        #--將彩圖轉成灰階，提高線條偵測率
-        img_name, img_dict["desc"] = "img_01", "灰階圖檔"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        cv2.imwrite(img_group[img_name]["path"], gray)
+        saving_dir = Path(saving_dir)
+        saving_dir.mkdir(parents=True, exist_ok=True)
         
-        #--二值化圖檔(自適應閾值)
-        img_name, img_dict["desc"] = "img_02_a", "二值化圖檔-自適應閾值"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        binary_adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 3)
-        cv2.imwrite(img_group[img_name]["path"], binary_adaptive)
-        #--二值化圖檔(固定閾值)
-        img_name, img_dict["desc"] = "img_02_b", "二值化圖檔-固定閾值"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        binary_thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        cv2.imwrite(img_group[img_name]["path"], binary_thresh)
-
-        #--標註輪廓(取自自適應二值化，有過濾太小雜訊及原圖邊框)
-        img_name, img_dict["desc"] = "img_03_a", "原圖加上輪廓-自適應二值化"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        contours, _ = cv2.findContours(binary_adaptive, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contour_img = color.copy()
-        for cnt in contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            #--過濾太小的雜訊方框，以及原圖的邊框
-            if (w > 100 and h > 100) and (w < ori_img.shape[1] * 0.9 and h < ori_img.shape[0] * 0.9): 
-                cv2.rectangle(contour_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.imwrite(img_group[img_name]["path"], contour_img)
-        #--標註輪廓(取自固定閾值二值化，有過濾太小雜訊及原圖邊框)
-        img_name, img_dict["desc"] = "img_03_b", "原圖加上輪廓-固定閾值二值化"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        contours, _ = cv2.findContours(binary_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contour_img2 = color.copy()
-        for cnt in contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            if (w > 100 and h > 100) and (w < ori_img.shape[1] * 0.9 and h < ori_img.shape[0] * 0.9): 
-                cv2.rectangle(contour_img2, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.imwrite(img_group[img_name]["path"], contour_img2)
+        #--讀取原圖資料、尺寸
+        ori_img = OpenCVManager.read_image(str(image_path))
+        if ori_img is None:
+            print(f"無法讀取圖片: {image_path}")
+            return False
+        img_shape = ori_img.shape[:2]  # (height, width)
         
-        """
-        #--從二值化抽出水平與垂直線條
-        img_name, img_dict["desc"] = "img_03_a1", "水平線條圖檔"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        horizontal = np.copy(binary)
-        cols = horizontal.shape[1]
-        h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (cols // 25, 1)) #--增大水平結構元素(3)
-        horizontal = cv2.erode(horizontal, h_kernel)
-        horizontal = cv2.dilate(horizontal, h_kernel)
-        cv2.imwrite(img_group[img_name]["path"], horizontal)
-
-        img_name, img_dict["desc"] = "img_03_a2", "垂直線條圖檔"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        vertical = np.copy(binary)
-        rows = vertical.shape[0]
-        v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, rows // 25))
-        vertical = cv2.erode(vertical, v_kernel)
-        vertical = cv2.dilate(vertical, v_kernel)
-        cv2.imwrite(img_group[img_name]["path"], vertical)
-
-        img_name, img_dict["desc"] = "img_03_a3", "水平垂直線條圖檔"
-        img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        img_group[img_name] = img_dict.copy()
-        table_mask = cv2.add(horizontal, vertical)
-        cv2.imwrite(img_group[img_name]["path"], table_mask)
-        """
-        # #--從二值化以霍夫變換偵測線段
-        # img_name, img_dict["desc"] = "img_03_b1", "霍夫線段檢測圖檔"
-        # img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        # img_group[img_name] = img_dict.copy()
-        # # threshold: 門檻值, minLineLength: 線段最小長度, maxLineGap: 容許斷裂間距
-        # rows, cols = binary.shape[:2]
-        # lines = cv2.HoughLinesP(binary, 1, np.pi/180, threshold=20, 
-        #                         minLineLength=20, maxLineGap=20)
-        # line_mask = np.zeros_like(binary)   #--建立空白圖
-        # if lines is not None:
-        #     for line in lines:
-        #         x1, y1, x2, y2 = line[0]
-        #         # 計算線段角度，過濾掉太短或雜亂的線，只留偏水平與偏垂直的
-        #         angle = np.abs(np.arctan2(y2 - y1, x2 - x1) * 180.0 / np.pi)
-        #         if angle < 20 or angle > 70: # 容許正負 20 度的歪斜
-        #             cv2.line(line_mask, (x1, y1), (x2, y2), 255, 3)
-        # # 現在的 line_mask 就是包含斜線的表格骨架，再做後續的矩形提取
-        # cv2.imwrite(img_group[img_name]["path"], line_mask)
-
-        # 現在 clean_lines 上的線段更扎實了，再做一次輪廓搜尋
-        # contours, _ = cv2.findContours(clean_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # for cnt in contours:
-        #     x, y, w, h = cv2.boundingRect(cnt)
-        #     # 過濾掉太小的部分，剩下的就是你要的 ROI
-        #     if w > 100 and h > 100: 
-        #         print(f"找到 ROI: x={x}, y={y}, w={w}, h={h}")
-        # # 畫出矩形區域
-        # cv2.rectangle(color, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        # cv2.imwrite(img_group[img_name]["path"], color)
-
-        # #--尋找矩形輪廓
-        # img_name, img_dict["desc"] = "img_04", "檢測矩形輪廓圖檔"
-        # img_dict["path"] = str(Path(saving_dir) / f"{img_name}.jpg")
-        # img_group[img_name] = img_dict.copy()
-        # contour_line = color.copy()
-
-        # #--顯示原圖大小
-        # print(f"原圖大小: {img.shape[1]}x{img.shape[0]}")
-        # # 1. 稍微膨脹讓斷裂的線接起來
-        # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-        # dilated = cv2.dilate(table_mask, kernel, iterations=2)
-        # # 使用較大的 Kernel，例如 7x7 或 9x9
-        # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (30, 30))
-        # closed = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
-        # cv2.imwrite(img_group[img_name]["path"], closed)
+        #--保存原始圖像
+        OpenCVManager.save_image(ori_img, str(saving_dir / "img_00_original.jpg"))
         
-        # # 2. 尋找輪廓
-        # # RETR_EXTERNAL 只找最外框，RETR_TREE 會找所有內層格子
-        # contours, _ = cv2.findContours(dilated_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        # rects = []
-        # for cnt in contours:
-        #     # 計算周長
-        #     peri = cv2.arcLength(cnt, True)
-        #     # 多邊形擬合 (epsilone 設為周長的 2%-5%)
-        #     approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+        #--轉換為灰階
+        gray = OpenCVManager.convert_to_gray(ori_img)
+        OpenCVManager.save_image(gray, str(saving_dir / "img_01_gray.jpg"))
+        
+        #--應用自適應二值化
+        binary_adaptive = OpenCVManager.apply_adaptive_threshold(gray)
+        OpenCVManager.save_image(binary_adaptive, str(saving_dir / "img_02_a_binary_adaptive.jpg"))
+        
+        #--應用Otsu二值化
+        binary_otsu = OpenCVManager.apply_otsu_threshold(gray)
+        OpenCVManager.save_image(binary_otsu, str(saving_dir / "img_02_b_binary_otsu.jpg"))
+        
+        #--使用自適應二值化尋找輪廓
+        valid_contours_adaptive = OpenCVManager.find_valid_contours(binary_adaptive, img_shape)
+        contour_img_adaptive = OpenCVManager.draw_contours(ori_img, valid_contours_adaptive)
+        OpenCVManager.save_image(contour_img_adaptive, str(saving_dir / "img_03_a_contours_adaptive.jpg"))
+        
+        #--使用Otsu二值化尋找輪廓
+        valid_contours_otsu = OpenCVManager.find_valid_contours(binary_otsu, img_shape)
+        contour_img_otsu = OpenCVManager.draw_contours(ori_img, valid_contours_otsu)
+        OpenCVManager.save_image(contour_img_otsu, str(saving_dir / "img_03_b_contours_otsu.jpg"))
+
+        #--彙整兩種方法的輪廓數量
+        print(f"自適應二值化找到有效輪廓數量: {len(valid_contours_adaptive)}")
+        print(f"Otsu二值化找到有效輪廓數量: {len(valid_contours_otsu)}")
+        contours_to_process = valid_contours_adaptive + valid_contours_otsu
+        
+        #--裁切ROI區域並儲存
+        roi_count = 0        
+        for idx, cnt in enumerate(contours_to_process):
+            roi = OpenCVManager.crop_roi(ori_img, cnt, padding=5)
+            roi_path = saving_dir / f"img_roi_{idx:02d}.jpg"
+            OpenCVManager.save_image(roi, str(roi_path))
+            roi_count += 1
             
-        #     # 如果擬合結果有 4 個頂點，則判定為矩形
-        #     if len(approx) == 4:
-        #         x, y, w, h = cv2.boundingRect(approx)
-        #         print(f"Detected rectangle at x:{x}, y:{y}, w:{w}, h:{h}")
-                
-        #         #--過濾太小的雜訊方框，以及原圖的邊框
-        #         if (w > 40 and h > 20) and (w < img.shape[1]*0.9 and h < img.shape[0]*0.9):
-        #             rects.append((x, y, w, h))
-        #             #--調用原圖畫上矩形框(綠色)
-        #             # cv2.drawContours(contour_line, [approx], -1, (0, 255, 0), 2)
-        #             cv2.rectangle(contour_line, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            #--可選：檢測ROI內的文字並篩選
+            if interest_texts:
+                res = EasyOCRManager.detect_text(str(roi_path), languages=["ch_tra", "en"], packaging_style="normal", gpu=False)
+                if res["status"] == "success":
+                    detected_text = EasyOCRManager.get_detected_text(res["data"]["processed_results"])
+                    if interest_texts in detected_text:
+                        print(f"找到目標文字 '{interest_texts}'，已儲存 ROI 圖片：{roi_path}")
         
-        # # rects 現在包含了所有檢測到的矩形坐標 (x, y, w, h)
-        # cv2.imwrite(img_group[img_name]["path"], contour_line)
-        
-        # #--計算線條密度(解決格線不對齊問題)
-        # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
-        # density = cv2.dilate(table_mask, kernel)
-        # intersections = cv2.bitwise_and(horizontal, vertical)
-
-        # contours, _ = cv2.findContours(
-        #     density,
-        #     cv2.RETR_EXTERNAL,
-        #     cv2.CHAIN_APPROX_SIMPLE
-        # )
-        # adjust_dir_path = Path(adjust_dir) / "image_05.jpg"
-        # cv2.imwrite(adjust_dir_path, table_mask)
-
-        # #--找面積最大的矩形輪廓
-        # table_cnt = max(contours, key=cv2.contourArea)
-        # x, y, w, h = cv2.boundingRect(table_cnt)
-        # table_roi = img[y:y+h, x:x+w]
-        # adjust_dir_path = Path(adjust_dir) / "image_06.jpg"
-        # cv2.imwrite(adjust_dir_path, table_roi)
-
+        print(f"處理完成，共裁切 {roi_count} 個 ROI 區域")
         return True
