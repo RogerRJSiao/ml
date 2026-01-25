@@ -25,7 +25,7 @@ class FileConfig:
         self.dirpath_adjusted = ""
         self.filepath_annotated = ""
     
-    def set_timestamp_str(self) -> str:
+    def _set_timestamp_str(self) -> str:
         """取得當前時間戳字串，格式: YYYYMMDD_HHMMSS_"""
         t = time.time()
         local_time = time.localtime(t)
@@ -65,7 +65,7 @@ class FileConfig:
                 basename = filename.rsplit(".", 1)[0]           #--去掉 .jpg
                 self.timestamp_str = basename.split("_", 1)[1]  #--去掉 up_
             if not self.timestamp_str:
-                self.set_timestamp_str()
+                self._set_timestamp_str()
             self.filepath_organized = self.__class__.ORGANIZED_DIR / f"up_{self.timestamp_str}{ext}"
         
         elif process == "to_annotated":
@@ -139,12 +139,12 @@ class FileValidator:
             return False, "檔案必須有副檔名"
         #--副檔名不在允許列表中
         if file_ext not in cls.ALLOWED_EXTENSIONS:
-            allowed = cls.get_allowed_extensions()
+            allowed = cls._get_allowed_extensions()
             return False, f"您上載了不允許的圖檔類型。指定：{allowed}"
         
         return True, ""
     
     @classmethod
-    def get_allowed_extensions(cls) -> str:
+    def _get_allowed_extensions(cls) -> str:
         """獲取允許的副檔名列表（逗號分隔）"""
         return ", ".join(sorted(cls.ALLOWED_EXTENSIONS))
