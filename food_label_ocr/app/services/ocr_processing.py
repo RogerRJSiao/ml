@@ -105,11 +105,12 @@ class OCRProcessService:
         if not adjust_dirpath.exists():
             adjust_dirpath.mkdir(parents=True, exist_ok=True)
 
-        # #--分割營養標示表區域
-        # cropped_result = EasyOCRManager.detect_and_crop_rectangle(
-        #     image_path=str(annotated.filepath_organized),
-        #     saving_dir=str(annotated.dirpath_adjusted)
-        # )
+        #--分割營養標示表區域
+        cropped_result = EasyOCRManager.detect_and_crop_area(
+            image_path=str(annotated.filepath_organized),
+            saving_dir=str(annotated.dirpath_adjusted),
+            interest_texts="營養標示"
+        )
          
         #--執行並存取EasyOCR文字偵測結果
         ocr_result = EasyOCRManager.detect_text(
