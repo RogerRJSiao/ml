@@ -293,20 +293,29 @@ class EasyOCRManager:
         contours_to_process = valid_contours_adaptive + valid_contours_otsu
         
         #--裁切ROI區域並儲存
-        roi_count = 0        
+        cropped_infos = {"path_to_roi": "", "path_to_original": "", "yx": [], "contour" : None, "roi_order": 0}
+        roi_count = 1        
         for idx, cnt in enumerate(contours_to_process):
             roi = OpenCVManager.crop_roi(ori_img, cnt, padding=5)
             roi_path = saving_dir / f"img_roi_{idx:02d}.jpg"
-            OpenCVManager.save_image(roi, str(roi_path))
+            OpenCVManager.save_image(roi["image"], str(roi_path))
+            #--儲存裁切區域資訊
+            cropped_infos["path_to_roi"] = str(roi_path)
+            cropped_infos["path_to_original"] = str(image_path)
+            cropped_infos["yx"] = roi["yx"]     #--bounding box 座標
+            cropped_infos["contour"] = cnt
+            cropped_infos["roi_order"] = idx
+            print(f"已儲存 ROI 圖片: {roi_path}，座標: {cropped_infos['yx']}")
+
             roi_count += 1
             
-            #--可選：檢測ROI內的文字並篩選
-            if interest_texts:
-                res = EasyOCRManager.detect_text(str(roi_path), languages=["ch_tra", "en"], packaging_style="normal", gpu=False)
-                if res["status"] == "success":
-                    detected_text = EasyOCRManager.get_detected_text(res["data"]["processed_results"])
-                    if interest_texts in detected_text:
-                        print(f"找到目標文字 '{interest_texts}'，已儲存 ROI 圖片：{roi_path}")
+            # #--可選：檢測ROI內的文字並篩選
+            # if interest_texts:
+            #     res = EasyOCRManager.detect_text(str(roi_path), languages=["ch_tra", "en"], packaging_style="normal", gpu=False)
+            #     if res["status"] == "success":
+            #         detected_text = EasyOCRManager.get_detected_text(res["data"]["processed_results"])
+            #         if interest_texts in detected_text:
+            #             print(f"找到目標文字 '{interest_texts}'，已儲存 ROI 圖片：{roi_path}")
         
         print(f"處理完成，共裁切 {roi_count} 個 ROI 區域")
         return True

@@ -96,5 +96,9 @@ class OpenCVManager:
         y_end = min(h_img, y + h + padding)
         x_start = max(0, x - padding)
         x_end = min(w_img, x + w + padding)
+        res = {
+            "yx": [[y_start, x_start], [y_end, x_end]],
+            "image": image[y_start:y_end, x_start:x_end]
+        }
         
-        return image[y_start:y_end, x_start:x_end]
+        return res
