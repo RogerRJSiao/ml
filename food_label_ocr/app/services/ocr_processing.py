@@ -75,11 +75,12 @@ class OCRProcessService:
         if packaging not in OCRProcessService.PACKAGING_CONFIG:
             packaging = "normal"    #--預設一般
 
-        #--確保整理(上載)、標註(下載)目錄存在
+        #--確保整理(上載)、調整後、標註(下載)目錄存在
         FileConfig.get_organized_dir()
+        FileConfig.get_adjusted_dir()
         FileConfig.get_annotated_dir()
 
-        #--準備標註檔案路徑
+        #--準備顯示結果檔案路徑
         annotated = FileConfig()
         if not annotated.change_filename_with_timestamp(filename, "to_organized"):
             msg = "讀取圖檔--命名不成功"
@@ -97,7 +98,19 @@ class OCRProcessService:
                 "msg": msg
             }
             return res
-      
+        
+        #--建立調整後的檔案路徑(用時戳命名)
+        adjust_dirpath = FileConfig.ADJUSTED_DIR / f"adj_{annotated.timestamp_str}"
+        annotated.dirpath_adjusted = adjust_dirpath
+        if not adjust_dirpath.exists():
+            adjust_dirpath.mkdir(parents=True, exist_ok=True)
+
+        # #--分割營養標示表區域
+        # cropped_result = EasyOCRManager.detect_and_crop_rectangle(
+        #     image_path=str(annotated.filepath_organized),
+        #     saving_dir=str(annotated.dirpath_adjusted)
+        # )
+         
         #--執行並存取EasyOCR文字偵測結果
         ocr_result = EasyOCRManager.detect_text(
             image_path=str(annotated.filepath_organized),
