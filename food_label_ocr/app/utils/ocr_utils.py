@@ -81,7 +81,8 @@ class EasyOCRManager:
         image_path: str,
         languages: List[str] = ["ch_tra", "en"],    #--繁體中文+英文(EasyOCR模型不接受中文+日文)
         packaging_style: str = "normal",
-        gpu: bool = True
+        gpu: bool = True,
+        target_texts: Optional[List[str]] = None
     ) -> Dict:
         """
         執行文字偵測並回傳結構化結果
@@ -133,10 +134,20 @@ class EasyOCRManager:
             #--處理偵測結果，並建立標註影像
             ocr_data = EasyOCRManager._process_ocr_results_and_create_annotated_image(languages, image_path, result_ocr)
             #--顯示偵測文字
-            print(f"OCR 偵測到文字數量: {len(ocr_data)}")
-            print("偵測文字內容:")
+            print(f"OCR偵測到文字組數: {len(ocr_data)}")
             for item in ocr_data:
-                print(f"文字: {item['text']}, 信心度: {item['confidence']}")
+                if target_texts: #--如果有指定目標文字，則進行比對
+                    found = []
+                    for target in target_texts:
+                        texts_found = {"text": "", "confidence": ""}
+                        if target not in item["text"]:
+                            continue
+
+                        #--如果找到目標文字，則儲存相關資訊
+                        print(f"找到目標文字 '{target}'，內容: {item['text']}, 信心度: {item['confidence']}")
+                        texts_found["text"] = item["text"]
+                        texts_found["confidence"] = item["confidence"]
+                        found.append(texts_found)                         
             
             return {
                 "status": "success",
@@ -147,7 +158,9 @@ class EasyOCRManager:
                     "image_shape": image.shape,
                     "languages": languages,
                     "packaging_style": packaging_style,
-                    "threshold_config": threshold_config
+                    "threshold_config": threshold_config,
+                    "img_path": str(image_path),
+                    "texts_and_confidence": found if target_texts else "未指定目標文字"
                 }
             }
             
@@ -243,7 +256,7 @@ class EasyOCRManager:
         return " ".join([r["text"] for r in processed_results])
 
     @staticmethod
-    def detect_and_crop_area(image_path: str, saving_dir: str, interest_texts: str = "") -> bool:
+    def detect_and_crop_area(image_path: str, saving_dir: str) -> bool:
         """
         辨別邊框輪廓後，裁切ROI區域並儲存處理過程的圖像
         Args:
@@ -293,45 +306,41 @@ class EasyOCRManager:
         OpenCVManager.save_image(contour_img_otsu, str(saving_dir / "img_03_b_contours_otsu.jpg"))
 
         #--彙整兩種方法的輪廓數量
-        print(f"自適應二值化找到有效輪廓數量: {len(valid_contours_adaptive)}")
-        print(f"Otsu二值化找到有效輪廓數量: {len(valid_contours_otsu)}")
+        print(f"\n原圖尺寸: {img_shape[1]}x{img_shape[0]} (寬x高)")
+        print(f"自適應二值化--有效輪廓數: {len(valid_contours_adaptive)}")
+        print(f"Otsu二值化--有效輪廓數: {len(valid_contours_otsu)}")
         contours_to_process = valid_contours_adaptive + valid_contours_otsu
         
         #--裁切ROI區域並儲存
-        cropped_infos = {"path_to_roi": "", "path_to_original": "", "yx": [], 
-                         "cnt_original": None, "cnt_corrected": None, 
-                         "roi_order": 0, "transform_info": {}}
-        roi_count = 1        
+        cropped = []  #--儲存裁切資訊的列表
+        cropped_infos = {"path_to_roi": "", "path_to_original": "",     #--圖檔的儲存路徑
+                         "yx": [],                                      #--裁切區域在原圖的起迄座標
+                         "cnt_original": None, "cnt_deskewed": None,    #--原始輪廓與透視校正後的輪廓資訊
+                         "transform_info": {}}                          #--透視變換相關資訊（包含變換矩陣、逆矩陣等）         
+        roi_count = 0        
         for idx, cnt in enumerate(contours_to_process):
             roi = OpenCVManager.crop_roi(ori_img, cnt, padding=5)
             roi_path = saving_dir / f"img_roi_{idx:02d}.jpg"
             OpenCVManager.save_image(roi["image"], str(roi_path))
+            print(f"第{roi_count}張--ROI: {roi_path}，起迄: {roi['yx']}")
             
-            #--校正歪斜輪廓為標準矩形
-            corrected_roi, corrected_cnt, transform_info = OpenCVManager.correct_skewed_contour(ori_img, cnt, padding=5)
-            corrected_roi_path = saving_dir / f"img_roi_corrected_{idx:02d}.jpg"
-            OpenCVManager.save_image(corrected_roi, str(corrected_roi_path))
-            
+            #--透視校正歪斜輪廓為標準矩形
+            deskewed_roi, deskewed_cnt, transform_info = OpenCVManager.correct_skewed_contour(ori_img, cnt, padding=5)
+            deskewed_roi_path = saving_dir / f"img_roi_deskewed_{idx:02d}.jpg"
+            OpenCVManager.save_image(deskewed_roi, str(deskewed_roi_path))
+            print(f"第{roi_count}張--透視校正: {deskewed_roi_path}，起迄: {roi['yx']}")          
+
             #--儲存裁切區域資訊
-            cropped_infos["path_to_roi"] = str(corrected_roi_path)
+            cropped_infos["path_to_roi"] = str(deskewed_roi_path)
             cropped_infos["path_to_original"] = str(image_path)
             cropped_infos["yx"] = roi["yx"]     #--bounding box 座標
-            cropped_infos["contour_original"] = cnt
-            cropped_infos["contour_corrected"] = corrected_cnt
-            cropped_infos["roi_order"] = idx
+            cropped_infos["cnt_original"] = cnt
+            cropped_infos["cnt_deskewed"] = deskewed_cnt
             cropped_infos["transform_info"] = transform_info  #--包含透視變換矩陣
-            print(f"已儲存 ROI 圖片: {roi_path}")
-            print(f"已儲存校正圖片: {corrected_roi_path}，座標: {cropped_infos['yx']}")
-
-            roi_count += 1
+            cropped.append(cropped_infos.copy())
             
-            #--檢測ROI內的文字並篩選
-            if interest_texts:
-                res = EasyOCRManager.detect_text(str(corrected_roi_path), languages=["ch_tra", "en"], packaging_style="normal", gpu=False)
-                if res["status"] == "success":
-                    detected_text = EasyOCRManager.get_detected_text(res["data"]["processed_results"])
-                    if interest_texts in detected_text:
-                        print(f"找到目標文字 '{interest_texts}'，已儲存 ROI 圖片：{roi_path}")
+            roi_count += 1
         
-        print(f"處理完成，共裁切 {roi_count} 個 ROI 區域")
-        return True
+        print(f"圖片處理完成！共切出ROI：{roi_count} 個", "\n" , "-" * 50, "\n")
+
+        return cropped

@@ -50,6 +50,7 @@ class OCRProcessService:
         Returns:
             dict: 包含處理狀態、檔案路徑、OCR 結果的字典
         """
+        print(f"===== OCR處理開始 =====")
 
         #--取出待處理的路徑、檔名
         filepath = Path(filepath)
@@ -106,20 +107,33 @@ class OCRProcessService:
             adjust_dirpath.mkdir(parents=True, exist_ok=True)
 
         #--分割營養標示表區域
+        print(f"開始OCR處理: {filepath} (語言: {language}, 包裝樣式: {packaging})")
         cropped_result = EasyOCRManager.detect_and_crop_area(
             image_path=str(annotated.filepath_organized),
-            saving_dir=str(annotated.dirpath_adjusted),
-            interest_texts="標示"
+            saving_dir=str(annotated.dirpath_adjusted)
         )
-         
-        #--執行並存取EasyOCR文字偵測結果
-        ocr_result = EasyOCRManager.detect_text(
-            image_path=str(annotated.filepath_organized),
-            languages=langs_list,
-            packaging_style=packaging,
-            gpu=True  #--預設嘗試使用GPU，如不可用則自動切換成CPU
-        )
-        
+
+        #--取得裁切資訊，並偵測特定文字
+        for idx, cropped_info in enumerate(cropped_result):
+            #--確認裁切區域存在，若不存在則跳過OCR偵測
+            print("." * 10, f"第{idx+1}張裁切資訊", "." * 10)
+            roi_path = cropped_info.get("path_to_roi")
+            print(f"讀取圖檔路徑: {roi_path}")
+            if not roi_path or not Path(roi_path).exists():
+                print(f"第{idx}張裁切區域不存在，跳過OCR偵測")
+                continue        
+            #--執行並存取EasyOCR文字偵測結果
+            ocr_result = EasyOCRManager.detect_text(
+                image_path=str(annotated.filepath_organized),
+                languages=langs_list,
+                packaging_style=packaging,
+                gpu=True,  #--預設嘗試使用GPU，如不可用則自動切換成CPU
+                target_texts=["標示", "成分", "過敏", "有效", "製造", "素"]
+            )
+
+            #--todo: 將OCR結果整理成結構化格式
+            
+            
         #--準備OCR回傳內容
         ocr_content = {}
         if ocr_result["status"] == "success":
@@ -163,5 +177,7 @@ class OCRProcessService:
             },
             "msg": f"OCR 處理完成 (指定語言: {language}, 指定樣式: {packaging})"
         }
+
+        print(f"===== OCR處理完成 =====")
         
         return ocr_result
