@@ -130,8 +130,7 @@ else:
                                         cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         cv2.imshow("gray", img_gray3)
         cv2.imshow("binary_bimodal", img_binary2)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+
     else:
         #--非明顯雙峰：通常代表光照不均或局部亮度差異，改用adaptiveThreshold依區域局部平均動態調整門檻
         print("非明顯雙峰分布(峰值數量:", len(peaks), ")，改用adaptiveThreshold")
@@ -139,8 +138,9 @@ else:
                                              cv2.THRESH_BINARY, blockSize=11, C=2)
         cv2.imshow("gray", img_gray3)
         cv2.imshow("binary_adaptive", img_binary2)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
     #--二值化-範例3：只取特定顏色(綠色)
     """
@@ -157,8 +157,107 @@ else:
     #--用遮罩取出原圖中的綠色部分，其餘變黑
     img_green_only = cv2.bitwise_and(img, img, mask=mask_green)
     
-    cv2.imshow("original", img)
-    cv2.imshow("mask_green", mask_green)
-    cv2.imshow("green_only", img_green_only)
+    # cv2.imshow("original", img)
+    # cv2.imshow("mask_green", mask_green)
+    # cv2.imshow("green_only", img_green_only)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    #--影像疊加、影像相減
+    """
+    #--疊加 → 想要「合成」兩張影像的內容（加上Logo、多重曝光效果、資料擴增、檢查遮罩效果）
+    #--相減 → 想要「找出差異」（動態偵測、工業產品瑕疵檢測、去除背景/雜訊）
+    """
+    #--影像疊加：cv2.addWeighted(img1, alpha, img2, beta, gamma)
+    #--          結果 = img1*alpha + img2*beta + gamma，需先將兩張圖resize成相同尺寸
+    img2_src = cv2.imread("../input/inv.jpg")
+    img2_resized = cv2.resize(img2_src, (img.shape[1], img.shape[0]))
+    img_blend = cv2.addWeighted(img, 0.7, img2_resized, 0.3, 0)  #--70% img + 30% img2
+
+    # cv2.imshow("img1", img)
+    # cv2.imshow("img2", img2_resized)
+    # cv2.imshow("blend", img_blend)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    #--影像相減
+    """
+    #--cv2.subtract(img1, img2)：dst = saturate(img1-img2)，負值會被截斷為0，
+    #--                          有方向性(img1-img2 != img2-img1)，
+    #--                          適合已知哪張圖較亮/當基準的情境(如已知背景比前景亮)。
+    #--cv2.absdiff(img1, img2)：dst = |img1-img2|，取絕對差，恆為正值，
+    #--                          absdiff(A,B) == absdiff(B,A)，
+    #--                          不需知道變化方向，是動態偵測/差異比對最常用的方式。
+    """
+    img_sub = cv2.subtract(img, img2_resized)
+    img_absdiff = cv2.absdiff(img, img2_resized)
+
+    # cv2.imshow("subtract", img_sub)
+    # cv2.imshow("absdiff", img_absdiff)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    #--圖檔去背(matting)：灰階+背景，存成透明PNG
+    """
+    #--1. 硬遮罩
+    #-- 轉灰階，用門檻判斷「接近白色」的像素(亮度夠高即視為背景)
+    #-- -> 轉BGRA多加alpha通道，把背景區域的alpha設為0(透明)，其餘設為255(不透明)
+    #-- -> 存檔副檔名務必為.png，jpg不支援透明度
+    #--
+    #--2. 漸層遮罩
+    #-- 只對gray>200的像素做漸層透明(alpha=255-gray)，而非0/255二值遮罩
+    #-- 灰階愈接近255(愈白)，alpha愈接近0(愈透明)；灰階愈低於255，愈不透明，
+    #-- 邊緣過渡處會有漸層，比硬遮罩更平滑、較不會有鋸齒邊。
+    """
+    #--1.去背(硬遮罩)
+    img_gray4 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, mask_bg = cv2.threshold(img_gray4, 200, 255, cv2.THRESH_BINARY)  #--亮度>200視為白色背景
+
+    img_bgra = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+    img_bgra[:, :, 3] = 255 - mask_bg  #--背景(mask_bg=255)處alpha設為0，其餘設為255
+
+    cv2.imwrite("../output/transparent.png", img_bgra)
+    print("saved transparent png to: ../output/transparent.png")
+
+    #--2.去背(漸層遮罩)
+    img_bgra_vec = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)    #--複製前3通道，第4通道255(不透明)
+    #img_gray4 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)      #--Gray = 0.114×B + 0.587×G + 0.299×R
+    mask = img_gray4 > 200
+    img_bgra_vec[mask, 3] = 255 - img_gray4[mask]           #--只有灰階值判為TRUE的才會調整第4通道，其餘保留
+
+    cv2.imwrite("../output/transparent_gradient.png", img_bgra_vec)
+    print("saved gradient transparent png to: ../output/transparent_gradient.png")
+
+    cv2.imshow("mask_bg", img_bgra)
+    cv2.imshow("mask_gradient_bg", img_bgra_vec)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    #--去背之後，套用新背景色(資料擴增)
+    """
+    #--資料擴增角度：同一個前景物件，套用多種不同背景色，讓模型訓練時
+    #--學習「辨識物件本身」而非「記住特定背景」，藉此提升泛化能力。
+    #--公式：輸出 = 前景×alpha + 新背景×(1-alpha)，alpha需正規化到0~1才能當混合權重。
+    """
+    def composite_on_bg(img, alpha_channel, bg_color):
+        bg = np.full(img.shape, bg_color, dtype=np.uint8)
+        alpha = alpha_channel / 255.0
+        alpha_3ch = cv2.merge([alpha, alpha, alpha])
+        result = img[:, :, :3] * alpha_3ch + bg * (1 - alpha_3ch)
+        return result.astype(np.uint8)
+
+    #--隨機產生N組背景色，模擬資料擴增流程
+    np.random.seed(42)  #--固定種子，方便重現同一批擴增結果
+    num_augmentations = 4
+    bg_colors = np.random.randint(0, 256, size=(num_augmentations, 3)).tolist()  #--BGR隨機色
+
+    for i, bg_color in enumerate(bg_colors):
+        img_aug = composite_on_bg(img, img_bgra[:, :, 3], tuple(bg_color))
+        cv2.imwrite(f"../output/augmented_bg_{i}.png", img_aug)
+        cv2.imshow(f"augmented_bg_{i} (BGR={bg_color})", img_aug)
+
+    print(f"已產生 {num_augmentations} 張不同背景色的擴增圖片")
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
