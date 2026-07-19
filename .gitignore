@@ -1,4 +1,7 @@
 ml_yolo/*
+!ml_yolo/src/
+ml_yolo/src/*
+!ml_yolo/src/cv2_practice_*
 food_label_ocr/uploads/*
 
 # Python
