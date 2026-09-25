@@ -1,0 +1,71 @@
+{
+  "Y2020": {
+    "source_files": {
+      "2020年度A1交通事故資料.csv": "df3f54ac338668304fe20eb2edabce3fe7afc311e6b6e690cbe6b27078379fa6",
+      "2020年度A2交通事故資料_1.csv": "aaffbd9a6a2afa72c3e9b65a9a59a4e1b29aaf489033a21351063520ffc0052a",
+      "2020年度A2交通事故資料_10.csv": "c75ecb75e77672af77faebe0e3608c4c71ec9320bf73d88706295ecda455410c",
+      "2020年度A2交通事故資料_11.csv": "888b2cac8f50f5e107979725b8670796531d428f0f9e5b40dd9b7a6115d652b9",
+      "2020年度A2交通事故資料_12.csv": "b7ee56b69842eb7b764b0ef8af0996ff161e987a868974d6fa9fd53945acbd41",
+      "2020年度A2交通事故資料_2.csv": "863e2ae5bb82e20807086b7227ba82f9a350e8ecfed904c12b01bfa3f4a50e27",
+      "2020年度A2交通事故資料_3.csv": "7469560ed6de55d1910ed6c01ea5103d9edea5beae4d95686a7fa78c4d73f1bc",
+      "2020年度A2交通事故資料_4.csv": "50f0bf794b3bf6e316629235060dc13190cbfe58c99ad61f0789098b1f3d0f1b",
+      "2020年度A2交通事故資料_5.csv": "0560252e99e75b1940f819886f8612134f6f467511580730612d83c72e510cb5",
+      "2020年度A2交通事故資料_6.csv": "1c92b3078711a11b3441b5b2660f84fdbac001323ae64f3f9bc2fa585ba12002",
+      "2020年度A2交通事故資料_7.csv": "4163ab12f3fe40f775026d218d3078f5a0502f1e0456872737b9426a9fd41055",
+      "2020年度A2交通事故資料_8.csv": "150c892c7b9532c53386f90caf61e0a425923ea1aa158fda950a823bd7506ea1",
+      "2020年度A2交通事故資料_9.csv": "38c8d51f1674352b670192b474dea1e1c096e2759e8ddd2985c53ce0eb12a3f3"
+    },
+    "expected_file_count": 13,
+    "actual_file_count": 13,
+    "output_file": "TW_traffic_accident_Y2020.csv",
+    "output_row_count": 817375,
+    "output_sha256": "cce9e7d8c48a560bd66c9afa9c646d36014938557ef8d7b6ea81d7b86b90bc2f",
+    "merged_at": "2026-09-25T09:21:51.677085+00:00"
+  },
+  "Y2021": {
+    "source_files": {
+      "2021年度A1交通事故資料.csv": "dea626deb51e4eb1ad1d994b7fe705c72b55199dbae87911f5c48dd9a7219021",
+      "2021年度A2交通事故資料_1.csv": "d8d76b821f2ec3e496558431659506f085cc663e13a6c7f2019f5c80dc4b2c72",
+      "2021年度A2交通事故資料_10.csv": "9cf0b113108c5b5505cf34278308a9720e4f2e4cdc8baea7989c45f363bf320a",
+      "2021年度A2交通事故資料_11.csv": "c0044a27d0ae2559ffccf3eebbeb30d89edeeaaeff53c2b4ff5c80eaca0c768f",
+      "2021年度A2交通事故資料_12.csv": "802dbe1ae134970c6ef82974902bd9ea525286fba1c52accd2e175cf53b804f2",
+      "2021年度A2交通事故資料_2.csv": "88bc390ee42a8639b6fe20d3ddb56cc3ad83b2f2d9becb2adffdb587a462906b",
+      "2021年度A2交通事故資料_3.csv": "42b4b1173d63e120e559f59dfba9903ac95d7632a2e450345629c8f37419034c",
+      "2021年度A2交通事故資料_4.csv": "4f45e29e2db50b84a43652f40bc9f46df097772e18238484987e2f7bc6a54e8f",
+      "2021年度A2交通事故資料_5.csv": "1b410491fddacce79c3a32c6138e29a6728f3809293803020d8ce857160255e3",
+      "2021年度A2交通事故資料_6.csv": "7a138cc9a4a2a2a94ed3aa1a4b44ec078df4281e8b68a7ec87969fcc355fcca4",
+      "2021年度A2交通事故資料_7.csv": "eeec3a2fe0f34eb53a4f6c39aad52a23ca4ccfe3b7d85ec4bad17b77a7893957",
+      "2021年度A2交通事故資料_8.csv": "74b6c18d36cf2eacdcbf36391b517720fcc3e46464d74bd27879b495a9c35d47",
+      "2021年度A2交通事故資料_9.csv": "d75eff733d32360beca9fdf69f5f2b544ccb9c41443b5317b284b264f58ef028"
+    },
+    "expected_file_count": 13,
+    "actual_file_count": 13,
+    "output_file": "TW_traffic_accident_Y2021.csv",
+    "output_row_count": 804394,
+    "output_sha256": "aca1500c52b61d2948d889093f40dbd2f6f9366b7e1f3c026f1245005d2d6698",
+    "merged_at": "2026-09-25T09:22:01.561786+00:00"
+  },
+  "Y2022": {
+    "source_files": {
+      "111年度A1交通事故資料.csv": "8ba1e95947fbe6bf5e1c6c46a4506a5b2ed3446c99771113be56b96c14beb106",
+      "111年度A2交通事故資料_1.csv": "e5d735ff1b7db3ad820d0b34a691bbbaa1cc24f8b52fc6fa5b37e4f6b77e555b",
+      "111年度A2交通事故資料_10.csv": "849ed53f1d951a6a20a1aa7512798032ad4a633af6b582ca342eb904734c4396",
+      "111年度A2交通事故資料_11.csv": "6ebc9a3cfb783f82faeb21ba851305604b978249204f2527eb38fb269874b7da",
+      "111年度A2交通事故資料_12.csv": "c07665a15e7c5135e844479b2dd0a000bfb1f8c787377eaa0290ea83071c2514",
+      "111年度A2交通事故資料_2.csv": "ea2a3f0a3e507ad8d62aca6b3fc594b02fe770d9d13811c0596b5683fed34dfa",
+      "111年度A2交通事故資料_3.csv": "1fc46fd9abe83d11c2c03c95c3daeacdef50a99b8eba5d6bd3e4fa4605b36b23",
+      "111年度A2交通事故資料_4.csv": "7f26ddeca09f365fe7d6e9195ac64fbe8105067f429bfe3e9537449b3ebff08b",
+      "111年度A2交通事故資料_5.csv": "db5a6b6857d78ffef37e15cb232c706fed58584a1a6b5eeb1259555c3278b4b4",
+      "111年度A2交通事故資料_6.csv": "3331096c2f2831643edea4eda336e9cc5b680011be32c9e6419ea82f5179f26b",
+      "111年度A2交通事故資料_7.csv": "db6a1aa0304b1037633fde7c1f6ad2263543a4240070300b95a7c4bceed0358f",
+      "111年度A2交通事故資料_8.csv": "f73faeda2fe47177689ca0c293d864d046365683ca37a0c6bde9391f461b7037",
+      "111年度A2交通事故資料_9.csv": "c67dab7b728143b16bb8bfb0e732cdeb88b83b25de7c8c3a6b91fecb188e6305"
+    },
+    "expected_file_count": 13,
+    "actual_file_count": 13,
+    "output_file": "TW_traffic_accident_Y2022.csv",
+    "output_row_count": 845572,
+    "output_sha256": "159e81428249129340506b0761c5bf6c49973b747cad47260fabcd860686150b",
+    "merged_at": "2026-09-25T09:22:11.886929+00:00"
+  }
+}

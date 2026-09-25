@@ -15,6 +15,13 @@ models/*.pkl
 registry/history/*
 !registry/history/.gitkeep
 
+# 年度合併後的衍生資料檔不入庫，只保留資料夾結構 (.gitkeep)
+data/processed/merged_years/*.csv
+!data/processed/merged_years/.gitkeep
+
+# 未來欄位清洗完成的資料集也不入庫
+data/processed/cleaned/**
+
 # Python
 __pycache__/
 *.py[cod]
