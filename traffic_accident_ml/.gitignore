@@ -1,0 +1,20 @@
+# 原始資料本體不入庫，只保留資料夾結構 (.gitkeep)
+data/raw/**
+!data/raw/.gitkeep
+!data/raw/**/.gitkeep
+
+# 原始 zip 暫存區不入庫，只保留資料夾結構 (.gitkeep)
+data/incoming/**
+!data/incoming/.gitkeep
+
+# 訓練產出的模型檔不入庫，只保留資料夾結構 (.gitkeep)
+models/*.joblib
+models/*.pkl
+
+# 每次 check_update 的比對紀錄不入庫，只保留資料夾結構 (.gitkeep)
+registry/history/*
+!registry/history/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
