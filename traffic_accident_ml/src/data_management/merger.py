@@ -13,13 +13,10 @@
 """
 
 import csv
-import hashlib
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 
-#--不管當前檔案位置，指定子專案根目錄的絕對路徑
-BASE_DIR = Path(__file__).resolve().parents[2]
+from .common import BASE_DIR, load_json_record, save_json_record, sha256_of_file
+
 #--解壓縮後csv存放位置（extractor.py 的輸出）
 RAW_DIR = BASE_DIR / "data" / "raw"
 #--年度匯總檔存放位置，屬於衍生資料，與 data/raw 的原始資料分開
@@ -32,28 +29,6 @@ EXCLUDED_FILENAMES = {"file.csv", "manifest.csv", "schema-file.csv"}
 
 #--目前慣例每年應有 A1 x1 + A2 x12（依月份拆分）共13份資料檔
 EXPECTED_FILE_COUNT = 13
-
-
-def _sha256_of_file(path):
-    #--建立雜湊運算物件
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        #--逐塊讀取，每次往下讀取(至多)1MB，直到檔案結束
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _load_record():
-    if MERGED_RECORD_PATH.exists():
-        return json.loads(MERGED_RECORD_PATH.read_text(encoding="utf-8"))
-    return {}
-
-
-def _save_record(record):
-    MERGED_RECORD_PATH.write_text(
-        json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
 
 
 def _merge_files_by_year(year_dir, record):
@@ -80,7 +55,7 @@ def _merge_files_by_year(year_dir, record):
         )
 
     #--計算每個csv的sha256
-    source_hashes = {p.name: _sha256_of_file(p) for p in source_files}
+    source_hashes = {p.name: sha256_of_file(p) for p in source_files}
     
     #--檢查合併後的csv檔案：用檔名+hash判斷來源是否有變更
     previous = record.get(year_dir.name)
@@ -125,7 +100,7 @@ def _merge_files_by_year(year_dir, record):
         "actual_file_count": len(source_files),
         "output_file": output_path.name,
         "output_row_count": row_count,
-        "output_sha256": _sha256_of_file(output_path),
+        "output_sha256": sha256_of_file(output_path),
         "merged_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -136,7 +111,7 @@ def _merge_files_by_year(year_dir, record):
 def merge_all():
     """合併 data/raw 底下每個年度資料夾，回傳所有輸出檔路徑清單。"""
     MERGED_YEARS_DIR.mkdir(parents=True, exist_ok=True)
-    record = _load_record()
+    record = load_json_record(MERGED_RECORD_PATH)
     outputs = []
     for year_dir in sorted(RAW_DIR.glob("Y*")):
         #--檢查解壓縮後的目錄是否存在
@@ -149,7 +124,7 @@ def merge_all():
 
     #--只有在真的有合併到任何年度時，才寫回 registry
     if outputs:
-        _save_record(record)
+        save_json_record(MERGED_RECORD_PATH, record)
     return outputs
 
 

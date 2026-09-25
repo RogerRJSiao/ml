@@ -13,16 +13,12 @@
   若同名 zip 內容有變，才會重新解壓縮並覆蓋 data/raw/Y<年度>/ 內對應內容。
 """
 
-import hashlib
-import json
 import re
 import zipfile
 from datetime import datetime, timezone
-from pathlib import Path
 
-#--不管當前檔案位置，指定子專案根目錄的絕對路徑
-#--Path(__file__)是這個py位置，resolve()轉成絕對路徑，parents[0]到[2]往回推目錄位置
-BASE_DIR = Path(__file__).resolve().parents[2]
+from .common import BASE_DIR, load_json_record, save_json_record, sha256_of_file
+
 #--原始下載zip存放位置
 INCOMING_DIR = BASE_DIR / "data" / "incoming"
 #--解壓縮後csv存放位置
@@ -33,18 +29,6 @@ EXTRACTED_RECORD_PATH = BASE_DIR / "registry" / "extracted_zips.json"
 ROC_YEAR_PATTERN = re.compile(r"(\d{2,3})年")
 WESTERN_YEAR_PATTERN = re.compile(r"(19|20)\d{2}")
 ROC_TO_WESTERN_OFFSET = 1911
-
-
-def _sha256_of_file(path):
-    #--建立雜湊運算物件
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        #--逐塊讀取，每次往下讀取(至多)1MB，直到檔案結束
-        #--iter()兩種寫法，單一參數是iter(list)，兩參數是iter(callable, sentinel)
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            #--分批餵入1MB的檔案內容，累加計算
-            digest.update(chunk)
-    return digest.hexdigest()   #--轉成十六進位字串輸出
 
 
 def _parse_year(filename):
@@ -61,31 +45,15 @@ def _parse_year(filename):
     return western_match.group(0) if western_match else None
 
 
-def _load_record():
-    #--用pathlib.Path讀取檔案
-    if EXTRACTED_RECORD_PATH.exists():
-        #--json.loads()把json字串轉成Py物件
-        return json.loads(EXTRACTED_RECORD_PATH.read_text(encoding="utf-8"))
-    return {}
-
-
-def _save_record(record):
-    #--用pathlib.Path寫入檔案
-    EXTRACTED_RECORD_PATH.write_text(
-        #--json.dumps()把Py物件轉成json字串
-        json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-
-
 def extract_all():
     """解壓縮 data/incoming/ 下方待處理的 zip，回傳有實際被解壓縮的檔名清單。"""
     #--取得最新的zip中繼資料
-    record = _load_record()
+    record = load_json_record(EXTRACTED_RECORD_PATH)
     processed = []
 
     for zip_path in sorted(INCOMING_DIR.glob("*.zip")):
         #--計算zip的hash
-        current_hash = _sha256_of_file(zip_path)
+        current_hash = sha256_of_file(zip_path)
         #--取出完整檔名(不包括目錄路徑)
         previous = record.get(zip_path.name)
         #--檢查zip檔名相同且hash相同，表示檔案未變更，無須更新
@@ -116,7 +84,7 @@ def extract_all():
 
     #--只有在真的有解壓縮到任何 zip 時，才寫回 registry
     if processed:
-        _save_record(record)
+        save_json_record(EXTRACTED_RECORD_PATH, record)
     return processed
 
 
