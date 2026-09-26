@@ -30,7 +30,7 @@
        (b) 同一案件同時出現在 A1 與 A2 時，保留 A1、刪除 A2。
     4. 刪除不合理案件：（同一案件的所有當事者資料列一併刪除）
        (a) 同一案件中，當事者順位有兩筆以上相同者，視為登錄有問題。
-       (b) 任一當事者「當事者事故發生時年齡」為 -1 或超過 100。
+       (b) 任一當事者「當事者事故發生時年齡」超過 100。
        (c) 經度、緯度不在台澎金馬範圍（GEO_BOXES）或空白。
        (d) 缺少當事者順位 1 或 2（例如只有一筆當事者資料），無法展開成兩個當事者。
     5. 轉為「一起案件一列」：
@@ -50,6 +50,8 @@
        (b) 依 當事者屬-性-別名稱 判定，空白的當事者類別欄位（PARTY_CAT_COLS）補填標籤：
            非人類當事者（NONHUMAN）年齡標 0、補填「not_applicable」（NA_LABEL）；
            肇逃未查獲（UNSOLVED）年齡維持原值、補填「unsolved」（UNSOLVED_LABEL）
+       (c) 「當事者事故發生時年齡」為 -1 的當事者視同無或物
+            年齡 0、空白的當事者類別欄位補填「not_applicable」（NA_LABEL）
     9. 去除不使用的欄位（DROP_COLS，即 COLUMN_MIGRATION 中標記 DROP 者），並調整欄位順序。
    10. 類別欄位改為英文代碼（CATEGORY_MAPS）
    11. 欄位改為英文名稱（CASE_RENAME、PARTY_RENAME，由 COLUMN_MIGRATION 推導），
@@ -251,14 +253,12 @@ def drop_dup_orders(df, removed):
 
 
 def drop_bad_ages(df, removed):
-    """步驟 4(b)：任一當事者年齡為 -1 或 >100 的案件，整組刪除"""
+    """步驟 4(b)：任一當事者年齡 >100 的案件，整組刪除"""
     age = pd.to_numeric(df[COL_AGE], errors="coerce")
-    bad_row = (age == -1) | (age > 100)
+    bad_row = age > 100
     bad_age = bad_row.groupby([df[c] for c in CASE_KEY], sort=False).transform("any")
-    df = drop_cases(df, bad_age, removed, "年齡登錄異常", "年齡為 -1 或 >100 的案件",
-                    extra=f"（觸發列 {bad_row.sum()} 列，其中 -1：{(age == -1).sum()}、"
-                          f">100：{(age > 100).sum()}）")
-    return df
+    return drop_cases(df, bad_age, removed, "年齡登錄異常", "年齡 >100 的案件",
+                      extra=f"（觸發列 {bad_row.sum()} 列）")
 
 
 def drop_out_of_bounds(df, removed):
@@ -393,7 +393,7 @@ def derive_columns(df):
 
 
 def correct_values(df):
-    """步驟 8：資料內容校正（修正錯字、標記非人類當事者；順位1、2 分別處理），
+    """步驟 8：資料內容校正（修正錯字、標記非人類當事者與年齡 -1 當事者；順位1、2 分別處理），
     判定完成後去除 當事者屬-性-別名稱"""
     for wrong, right in TYPO_FIX.items():
         n_fix = 0
@@ -403,16 +403,21 @@ def correct_values(df):
         log(f"[錯字] {COL_PROTECTION}：「{wrong}」→「{right}」{n_fix} 人")
 
     #--非人類當事者：年齡標 0；肇逃未查獲：年齡維持原值。兩者空白類別欄位各自補填標籤
-    fill_party_blanks(df, NONHUMAN, NA_LABEL, "非人類當事者", zero_age=True)
-    fill_party_blanks(df, UNSOLVED, UNSOLVED_LABEL, "肇逃未查獲當事者")
+    fill_party_blanks(df, lambda p: df[p + COL_GENDER].isin(NONHUMAN),
+                      NA_LABEL, "非人類當事者", zero_age=True)
+    fill_party_blanks(df, lambda p: df[p + COL_GENDER].isin(UNSOLVED),
+                      UNSOLVED_LABEL, "肇逃未查獲當事者")
+    #--其餘年齡為 -1 者視同無或物：年齡標 0、空白類別欄位補填 NA_LABEL
+    fill_party_blanks(df, lambda p: (df[p + COL_AGE] == -1) & ~df[p + COL_GENDER].isin(NONHUMAN + UNSOLVED),
+                      NA_LABEL, "年齡 -1 當事者（視同無或物）", zero_age=True)
     return df.drop(columns=party_cols(COL_GENDER))
 
 
-def fill_party_blanks(df, genders, label, name, zero_age=False):
-    """當事者屬-性-別名稱 屬於 genders 者，空白的當事者類別欄位（PARTY_CAT_COLS）填入 label（順位1、2 分別處理）"""
+def fill_party_blanks(df, select, label, name, zero_age=False):
+    """select(p) 選出的順位 p 當事者，空白的當事者類別欄位（PARTY_CAT_COLS）填入 label（順位1、2 分別處理）"""
     n_party = age_changed = n_fill = 0
     for p in PARTY_PREFIXES:
-        hit = df[p + COL_GENDER].isin(genders)
+        hit = select(p).fillna(False).astype(bool)
         n_party += hit.sum()
         if zero_age:
             age_changed += (hit & (df[p + COL_AGE] != 0)).sum()
