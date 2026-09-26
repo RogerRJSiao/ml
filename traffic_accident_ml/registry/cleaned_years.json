@@ -1,0 +1,65 @@
+{
+  "Y2020": {
+    "source_file": "TW_traffic_accident_Y2020.csv",
+    "source_sha256": "cce9e7d8c48a560bd66c9afa9c646d36014938557ef8d7b6ea81d7b86b90bc2f",
+    "rule_files": {
+      "cleaner.py": "ced40fc51eca90d13fb572f0d89790beeeb81a54d4b4c943ea8c509b6d051bcf",
+      "cleaning_rules.py": "6cd756fa3c680e954cdcfa4d3b634da40e43222e3be67f49e78ab8ca185fb332"
+    },
+    "output_file": "TW_traffic_accident_Y2020_cleaned.csv",
+    "output_row_count": 331486,
+    "output_sha256": "3871d4da0e2287fc892f7d6f14b3320101d85663b36a9161de473ab6888d77d5",
+    "removed_file": "TW_traffic_accident_Y2020_removed.csv",
+    "removed_counts": {
+      "整列完全重複": 3,
+      "A1/A2重複（保留A1）": 2,
+      "當事者順位重複": 129,
+      "年齡登錄異常": 73274,
+      "經緯度異常": 4,
+      "缺少當事者順位": 0
+    },
+    "cleaned_at": "2026-09-26T15:13:38.197570+00:00"
+  },
+  "Y2022": {
+    "source_file": "TW_traffic_accident_Y2022.csv",
+    "source_sha256": "159e81428249129340506b0761c5bf6c49973b747cad47260fabcd860686150b",
+    "rule_files": {
+      "cleaner.py": "ced40fc51eca90d13fb572f0d89790beeeb81a54d4b4c943ea8c509b6d051bcf",
+      "cleaning_rules.py": "6cd756fa3c680e954cdcfa4d3b634da40e43222e3be67f49e78ab8ca185fb332"
+    },
+    "output_file": "TW_traffic_accident_Y2022_cleaned.csv",
+    "output_row_count": 342439,
+    "output_sha256": "6306470d3f4e08fef9604aa412ebf415d223507d391fc8a9f7a84ff154f75fc9",
+    "removed_file": "TW_traffic_accident_Y2022_removed.csv",
+    "removed_counts": {
+      "整列完全重複": 5,
+      "A1/A2重複（保留A1）": 2,
+      "當事者順位重複": 144,
+      "年齡登錄異常": 79821,
+      "經緯度異常": 7,
+      "缺少當事者順位": 0
+    },
+    "cleaned_at": "2026-09-26T15:16:21.773362+00:00"
+  },
+  "Y2021": {
+    "source_file": "TW_traffic_accident_Y2021.csv",
+    "source_sha256": "aca1500c52b61d2948d889093f40dbd2f6f9366b7e1f3c026f1245005d2d6698",
+    "rule_files": {
+      "cleaner.py": "ced40fc51eca90d13fb572f0d89790beeeb81a54d4b4c943ea8c509b6d051bcf",
+      "cleaning_rules.py": "6cd756fa3c680e954cdcfa4d3b634da40e43222e3be67f49e78ab8ca185fb332"
+    },
+    "output_file": "TW_traffic_accident_Y2021_cleaned.csv",
+    "output_row_count": 325882,
+    "output_sha256": "b00078aab397cd87ade583024f2e0d3576a572541282c3d9eedff56696a65301",
+    "removed_file": "TW_traffic_accident_Y2021_removed.csv",
+    "removed_counts": {
+      "整列完全重複": 6,
+      "A1/A2重複（保留A1）": 0,
+      "當事者順位重複": 92,
+      "年齡登錄異常": 76818,
+      "經緯度異常": 4,
+      "缺少當事者順位": 1
+    },
+    "cleaned_at": "2026-09-26T15:17:46.248320+00:00"
+  }
+}
