@@ -99,6 +99,35 @@ traffic_accident_ml/
     ```
     - 若在不正確的位置，讓程式使用相對匯入的話，通常會出現 `ImportError` 或 `ModuleNotFoundError: No module named 'src'` 的報錯。
 
+## 資料 pipeline 正確性驗證 ✅
+
+### 資料清洗 (powered by cleaner.py)
+
+> 每當清洗一個年度，會把前後的列數記錄到 `registry/cleaned_years.json`，可以拿來確認每一份原始資料列的篩除/保留原因。
+
+| key | 說明 |
+|---|---|
+| `input_row_count` | 讀入年度匯總檔（`merged_years/`）的原始列數 |
+| `footer_rows_dropped` | 刪除的檔尾說明註解資料列。每年度由 13 份檔案彙總，故通常為 26 列的無用資料。 |
+| `removed_counts` | 因「資料異常」或「研究目的」調整資料集，移除的列數明細都儲存於 `*_removed.csv` |
+| `output_row_count` | 輸出 `*_cleaned.csv` 的列數（單一案件合併成一列） |
+
+- **驗證規則**：原始資料列每列都是一位當事者，資料清洗過程只保留順位 1、2，並把兩位當事者合併成一列，因此輸出一列相當於兩列原始資料。
+    ```
+    input_row_count = footer_rows_dropped + Σ removed_counts + 2 × output_row_count
+    ```
+- 要點 1：等號兩邊不相等，代表有資料在清洗過程中遺漏或重複計算。
+- 要點 2：`Σ removed_counts` 應等於 `*_removed.csv` 的列數，而 `output_row_count` 應等於 `*_cleaned.csv` 的列數。
+
+- 驗證結果範例
+
+    | 年度 | input_row_count | footer_rows_dropped | Σ removed_counts | output_row_count | 差額 |
+    |---|---|---|---|---|---|
+    | 2020 | 817,375 | 26 | 103,737 | 356,806 | 0 |
+    | 2021 | 804,394 | 26 | 99,952 | 352,208 | 0 |
+    | 2022 | 845,572 | 26 | 104,054 | 370,746 | 0 |
+
+
 ## 模型開發與部署規畫 (TBC)
 
 > 以下各階段皆為手動觸發，沒有排程或自動化機制；每個階段都需要人工確認後才執行下一步。
