@@ -58,7 +58,7 @@ traffic_accident_ml/
 │   ├── merged_years.json       # merger.py 記錄各年度來源檔案的 sha256，避免重複合併
 │   └── history/                # 每次執行 check_update.py 的比對紀錄
 ├── models/                     # 訓練完成的模型檔與 metadata.json
-├── requirements.txt
+├── environment.yml             # conda 環境定義
 └── src/
     ├── schema.py                    # 固定欄位 schema 定義（50+ 欄位），供 loader.py 驗證用
     ├── data_management/
@@ -76,6 +76,28 @@ traffic_accident_ml/
     │   └── plots.py                 # 可視化 pipeline：資料分布圖、PCA 投影圖、特徵重要性等
     └── predictor.py                 # 對外唯一入口，供其他 py 檔案 import 使用訓練完成的模型
 ```
+
+## 環境建置 🛠️
+
+1. 安裝 [Anaconda](https://www.anaconda.com/download) 。
+    - 本專案只使用 Anaconda 管理虛擬環境與套件。
+    - 安裝完成後可從開始選單開啟 Anaconda Prompt。
+
+2. 開啟 Anaconda Prompt，切換到本專案目錄，依 `environment.yml` 建立並啟動虛擬環境。
+    ``` Anaconda Prompt
+    (base) D:\your-project\traffic_accident_ml> conda env create -f environment.yml
+    (base) D:\your-project\traffic_accident_ml> conda activate traffic_ml
+    ```
+    - 要點 1：請確認 VSCode 開啟 .py 時，右下角虛擬環境是在 `traffic_ml`。
+    - 要點 2：`environment.yml` 的套件全部由 conda-forge 安裝，避免 pip 和 conda 混裝造成的套件衝突。之後若新增套件，請更新 `environment.yml`。
+    - 要點 3：若套件有更新，可執行 `conda env update -f environment.yml --prune` 同步環境。
+    - 要點 4：切換到本專案目錄只是為了讓 `-f environment.yml` 找得到檔案；也可在任何目錄改用完整路徑，如 `conda env create -f D:\your-project\traffic_accident_ml\environment.yml`。conda 環境統一建立在 Anaconda 的 `envs\traffic_ml`，不會建在專案資料夾內。
+
+3. 所有 py 程式都以模組方式、一定要在 `traffic_accident_ml/` 目錄下方執行。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.data_management.cleaner
+    ```
+    - 若在不正確的位置，讓程式使用相對匯入的話，通常會出現 `ImportError` 或 `ModuleNotFoundError: No module named 'src'` 的報錯。
 
 ## 模型開發與部署規畫 (TBC)
 
