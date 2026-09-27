@@ -136,19 +136,25 @@ traffic_accident_ml/
 1. 將各年度原始資料 zip 放入 `data/incoming/`。
 2. 手動執行 `python -m src.data_management.extractor` 依年度解壓縮到 `data/raw/Y<年度>/`。
 3. 手動執行 `python -m src.data_management.merger` 將各年度 csv 合併到 `data/processed/merged_years/`。
-4. 手動執行 `python -m src.data_management.check_update` 檢查資料是否有更新、是否建議重新訓練（僅回報，不自動觸發）。
-5. 人工判讀第 4 步的報表後，若確認需要重新訓練，手動執行 `python -m src.training.train`：內部依序跑 loader → 前處理 → (PCA) → 監督式學習模型，並將模型檔與 `metadata.json` 輸出至 `models/`。
+4. 手動執行 `python -m src.data_management.cleaner` 逐年清洗年度匯總檔，輸出到 `data/processed/cleaned/`，列數記錄於 `registry/cleaned_years.json`。
+    - 不帶參數：逐年檢查，來源檔 sha256 未變更且輸出檔都在的年度會略過（`[skip]`）。
+    - 帶參數：`--force yyyy...`：只處理指定的西元年，不論處理狀態一律重新清洗。欄位對照表、編碼對照表中其他年度的列沿用上次結果。
+    - 使用時機
+        - 只修改 `cleaner.py` 或 `cleaning_rules.py` 的清洗規則時，來源檔不會變更，若只用不帶參數執行會全部略過，這時請用 `--force` 重新清洗。
+        - 希望採非連續性的年度執行時，而連續年度資料清洗時，可一次指定多個年度，指令如 `python -m src.data_management.cleaner --force 2023 2020 2021`。
+5. 手動執行 `python -m src.data_management.check_update` 檢查資料是否有更新、是否建議重新訓練（僅回報，不自動觸發）。
+6. 人工判讀第 5 步的報表後，若確認需要重新訓練，手動執行 `python -m src.training.train`：內部依序跑 loader → 前處理 → (PCA) → 監督式學習模型，並將模型檔與 `metadata.json` 輸出至 `models/`。
 
 ### 評估階段
-6. `train.py` 於保留的測試集上計算評估指標（如準確率、F1-score、混淆矩陣），連同訓練資料版本、使用的特徵一併寫入 `models/metadata.json`，作為不同版本模型的比較依據。
-7. 手動執行 `python -m src.visualization.plots` 產出對應圖表（如混淆矩陣熱圖、PCA 投影圖、特徵重要性圖），輔助人工判斷這次訓練出的模型是否可以取代目前使用中的版本。
-8. 人工比對新舊模型的評估指標與圖表後，決定是否手動將新模型標記為採用版本（例如更新 `metadata.json` 中的 active 版本欄位）。
+7. `train.py` 於保留的測試集上計算評估指標（如準確率、F1-score、混淆矩陣），連同訓練資料版本、使用的特徵一併寫入 `models/metadata.json`，作為不同版本模型的比較依據。
+8. 手動執行 `python -m src.visualization.plots` 產出對應圖表（如混淆矩陣熱圖、PCA 投影圖、特徵重要性圖），輔助人工判斷這次訓練出的模型是否可以取代目前使用中的版本。
+9. 人工比對新舊模型的評估指標與圖表後，決定是否手動將新模型標記為採用版本（例如更新 `metadata.json` 中的 active 版本欄位）。
 
 ### 推論階段
-9. 其他 py 檔案透過以下方式複用目前採用中的模型：
-   ```python
-   from traffic_accident_ml.src.predictor import load_model, predict
+10. 其他 py 檔案透過以下方式複用目前採用中的模型：
+    ```python
+    from traffic_accident_ml.src.predictor import load_model, predict
 
-   model = load_model()
-   result = predict(model, df)
-   ```
+    model = load_model()
+    result = predict(model, df)
+    ```
