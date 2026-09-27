@@ -5,6 +5,7 @@
 
 使用方式：
     python -m src.data_management.cleaner
+    python -m src.data_management.cleaner --force 2021 2022   #--強制重新清洗指定西元年
 
 規則：
 - 一個年度一個年度分開清洗，不跨年度合併：
@@ -17,6 +18,7 @@
   data/processed/cleaned/TW_traffic_accident_欄位對照表.csv、TW_traffic_accident_編碼對照表.csv
 - 用 registry/cleaned_years.json 記錄每個年度的來源檔 sha256，
   來源檔未變更且輸出檔都在時略過該年度，總表中該年度的列沿用上次結果。
+  以 --force 指定西元年時，只處理該年度且不論狀態一律重新清洗，總表中其他年度的列沿用上次結果。
 - 欄位名稱、各欄位的處理方式與清洗規則常數皆定義於 cleaning_rules.py：
   每個欄位的層級（案件/當事者）、處理方式（KEEP/DROP/SPLIT/MERGE/INTERNAL/DERIVE）
   與輸出英文欄名以 COLUMN_MIGRATION 為準，下列步驟中的大寫名稱皆為其中的常數。
@@ -58,6 +60,7 @@
        並產生該年度的欄位對照表（含每欄填答樣式，依頻度由高到低）
        及編碼對照表（每個類別欄位的原始值 → 英文代碼），全部年度跑完後合併成總表輸出
 """
+import argparse
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -587,16 +590,32 @@ def summarize_cols(total, year):
     return rows.drop(columns="年度").reset_index(drop=True) if len(rows) else None
 
 
-def clean_all():
-    """逐年清洗 data/processed/merged_years/ 底下的年度匯總檔，回傳本次有重新清洗的輸出檔路徑清單。
-    來源檔未變更、輸出檔與總表中該年度的列都在時，略過該年度。"""
+def clean_all(force_years=()):
+    """
+    逐年清洗 data/processed/merged_years/ 底下的年度匯總檔
+    - 回傳本次有重新清洗的輸出檔路徑清單。
+    - 來源檔未變更、輸出檔與總表中該年度的列都在時，略過該年度。
+    - 若指定 force_years 時只處理該些西元年，一律重新清洗；總表中其他年度的列沿用上次結果。
+    """
     #--建立清洗後資料夾
     CLEANED_DIR.mkdir(parents=True, exist_ok=True)
     #--檢查年度匯總檔csv
-    sources = sorted(MERGED_YEARS_DIR.glob("TW_traffic_accident_Y*.csv"))
+    force_years = sorted({str(y) for y in force_years})
+    if force_years:
+        #--指定西元年時，只取該年度的年度匯總檔，其他年度不列入
+        sources = [MERGED_YEARS_DIR / f"TW_traffic_accident_Y{y}.csv" for y in force_years]
+        missing = [p.name for p in sources if not p.exists()]
+        if missing:
+            log(f"[warn] --force 指定的年度找不到年度匯總檔：{', '.join(missing)}")
+        sources = [p for p in sources if p.exists()]
+        if not sources:
+            return []
+    else:
+        sources = sorted(MERGED_YEARS_DIR.glob("TW_traffic_accident_Y*.csv"))
     if not sources:
         log(f"[skip] {MERGED_YEARS_DIR} 找不到年度匯總檔，請先執行 merger.py")
         return []
+    
     #--取得資料集狀態中繼資料
     cleaned_record = load_json_record(CLEANED_RECORD_PATH)
     #--取得欄位對照表、編碼對照表csv
@@ -612,7 +631,8 @@ def clean_all():
         previous = cleaned_record.get(f"Y{year}")
         dictionary, codebook = summarize_cols(old_dicts, year), summarize_cols(old_codebooks, year)
         if (
-            previous is not None
+            not force_years                                 #--未指定強制重新清洗
+            and previous is not None                        #--資料集狀態中繼資料有資料
             and previous.get("source_sha256") == src_hash   #--資料集狀態中繼資料與之前一致
             and out_path.exists()                           #--清洗後保留資料集存在
             and get_removed_path(out_path).exists()         #--清洗後刪除資料集存在
@@ -621,7 +641,8 @@ def clean_all():
         ):
             log(f"[skip] {src_path.name}：來源檔未變更，略過重新清洗")
         else:
-            log(f"===== {src_path.name} -> {out_path.name} =====")
+            forced = "（--force 強制重新清洗）" if force_years else ""
+            log(f"===== {src_path.name} -> {out_path.name} {forced}=====")
             #--開始執行單一年度的資料清洗
             dictionary, codebook, counts = clean_year(src_path, out_path)
             #--建立單筆年度已清洗的中繼資料
@@ -642,6 +663,16 @@ def clean_all():
         dicts.append((year, dictionary))
         codebooks.append((year, codebook))
 
+    #--指定西元年時，總表中其他年度的列沿用上次結果，避免整份覆寫時遺失
+    if force_years:
+        for old, tables in ((old_dicts, dicts), (old_codebooks, codebooks)):
+            if old is None:
+                continue
+            done = {year for year, _ in tables}
+            for year in sorted(set(old["年度"]) - done):
+                tables.append((year, summarize_cols(old, year)))
+            tables.sort(key=lambda t: t[0])
+
     #--只有在真的執行清洗時，才重新產生總表、寫回 registry
     if outputs:
         write_summary_to_csv(dicts, DICT_PATH, "欄位對照表")
@@ -651,4 +682,16 @@ def clean_all():
 
 
 if __name__ == "__main__":
-    clean_all()
+    #--命令列參數：不帶參數時逐年檢查
+    parser = argparse.ArgumentParser(description="指定西元年清洗年度匯總檔")
+    #--可一次指定多個年度，只處理這些年度的重新清洗
+    parser.add_argument(
+        #--在 "--force" 後方至少接一個參數，每個參數值都是int
+        "--force", nargs="+", type=int, default=[], metavar="YEAR",
+        help="強制重新清洗指定的西元年(如 --force 2021 2024)",
+    )
+    args = parser.parse_args()
+
+    #--執行資料清洗流程
+    clean_all(force_years=args.force)
+ 
