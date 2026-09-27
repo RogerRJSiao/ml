@@ -116,7 +116,7 @@ def read_one(path):
     log(f"[讀入] {path}: {raw_row_count} 列，刪除說明列 {raw_row_count - len(df)} 列")
     #--新增一欄，建立原始資料的索引值
     df[RID] = df.index
-    return df
+    return df, raw_row_count
 
 def check_datetime(df, removed):
     """步驟 2：檢查日期、時間字串格式，異常者整起案件刪除"""
@@ -520,11 +520,12 @@ def clean_year(src_path, out_path):
     """
     清洗單一年度彙總檔 src_path，輸出到 out_path
     輸入：年度彙總資料集路徑、年度清洗後資料集路徑
-    回傳該年度的 (欄位對照表, 編碼對照表, 輸出列數, 各移除原因列數)
+    回傳該年度的 (欄位對照表, 編碼對照表, 列數統計)
+    列數統計含讀入列數、檔尾說明列數、輸出列數、各移除原因列數
     """
     removed = []
     #--步驟 1：以字串讀入並檢查原始欄位、刪除檔尾說明列
-    raw = read_one(src_path)
+    raw, input_row_count = read_one(src_path)
     #--步驟 2：檢查日期、時間格式，異常案件整起刪除
     df = check_datetime(raw.copy(), removed)
     #--步驟 3：去除重複並整併案件
@@ -551,7 +552,13 @@ def clean_year(src_path, out_path):
     removed_counts = {}
     for reason, rids in removed:
         removed_counts[reason] = removed_counts.get(reason, 0) + len(rids)
-    return dictionary, codebook, len(df), removed_counts
+    counts = {
+        "input_row_count": input_row_count,
+        "footer_rows_dropped": input_row_count - len(raw),
+        "output_row_count": len(df),
+        "removed_counts": removed_counts,
+    }
+    return dictionary, codebook, counts
 
 
 def write_summary_to_csv(tables, path, label):
@@ -616,16 +623,18 @@ def clean_all():
         else:
             log(f"===== {src_path.name} -> {out_path.name} =====")
             #--開始執行單一年度的資料清洗
-            dictionary, codebook, row_count, removed_counts = clean_year(src_path, out_path)
+            dictionary, codebook, counts = clean_year(src_path, out_path)
             #--建立單筆年度已清洗的中繼資料
             cleaned_record[f"Y{year}"] = {
                 "source_file": src_path.name,
                 "source_sha256": src_hash,
+                "input_row_count": counts["input_row_count"],
+                "footer_rows_dropped": counts["footer_rows_dropped"],
                 "output_file": out_path.name,
-                "output_row_count": row_count,
+                "output_row_count": counts["output_row_count"],
                 "output_sha256": sha256_of_file(out_path),
                 "removed_file": get_removed_path(out_path).name,
-                "removed_counts": removed_counts,
+                "removed_counts": counts["removed_counts"],
                 "cleaned_at": datetime.now(timezone.utc).isoformat(),
             }
             outputs.append(out_path)    #--檢查用
