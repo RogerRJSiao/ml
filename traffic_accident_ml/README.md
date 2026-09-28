@@ -134,33 +134,93 @@ traffic_accident_ml/
     | 2022 | 845,572 | 26 | 104,054 | 370,746 | 0 |
 
 
-## 模型開發與部署規畫 (TBC)
+## 模型開發與部署規畫
 
-> 以下各階段皆為手動觸發，沒有排程或自動化機制；每個階段都需要人工確認後才執行下一步。
+> 以下皆為手動觸發，暫時沒有排程或自動化機制；每一階段都需要人工確認後才執行下一步。🤚
 
-### 訓練階段
-1. 將各年度原始資料 zip 放入 `data/incoming/`。
-2. 手動執行 `python -m src.data_management.extractor` 依年度解壓縮到 `data/raw/Y<年度>/`。
-3. 手動執行 `python -m src.data_management.merger` 將各年度 csv 合併到 `data/processed/merged_years/`。
-4. 手動執行 `python -m src.data_management.cleaner` 逐年清洗年度匯總檔，輸出到 `data/processed/cleaned/`，列數記錄於 `registry/cleaned_years.json`。
-    - 不帶參數：逐年檢查，來源檔 sha256 未變更且輸出檔都在的年度會略過（`[skip]`）。
+### 資料前處理
+1. 下載並將各年度原始資料 zip 放入 `data/incoming/`。
+2. 手動執行 extractor，依年度解壓縮到 `data/raw/Y<年度>/`。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.data_management.extractor
+    ```
+3. 手動執行 merger，將各年度 csv 合併到 `data/processed/merged_years/`。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.data_management.merger
+    ```
+4. 手動執行 cleaner，逐年清洗年度匯總檔，輸出到 `data/processed/cleaned/`，列數記錄於 `registry/cleaned_years.json`。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.data_management.cleaner
+    ```
+    - 不帶參數：逐年檢查，來源檔 sha256 未變更且輸出檔都在的年度會略過(`[skip]`)。
     - 帶參數：`--force yyyy...`：只處理指定的西元年，不論處理狀態一律重新清洗。欄位對照表、編碼對照表中其他年度的列沿用上次結果。
     - 使用時機
         - 只修改 `cleaner.py` 或 `cleaning_rules.py` 的清洗規則時，來源檔不會變更，若只用不帶參數執行會全部略過，這時請用 `--force` 重新清洗。
-        - 希望採非連續性的年度執行時，而連續年度資料清洗時，可一次指定多個年度，指令如 `python -m src.data_management.cleaner --force 2023 2020 2021`。
-5. 手動執行 `python -m src.data_management.check_update` 檢查資料是否有更新、是否建議重新訓練（僅回報，不自動觸發）。
-6. 人工判讀第 5 步的報表後，若確認需要重新訓練，手動執行 `python -m src.training.train`：內部依序跑 loader → 前處理 → (PCA) → 監督式學習模型，並將模型檔與 `metadata.json` 輸出至 `models/`。
+        - 希望採非連續性的年度執行時，而連續年度資料清洗時，可一次指定多個年度，指令如下：
+            ``` Anaconda Prompt
+            (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.data_management.cleaner --force 2023 2020 2021
+            ```
+
+### 訓練階段
+5. 若確認需要重新訓練，手動執行 train。
+    - 目前只能訓練：severity (A1=1、A2=0) (`severity_model.py`)。
+    - 尚未接入訓練：injured_num (`injury_model.py`)。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.training.train
+    ```
+    **內部依序執行**：
+    1. 讀取資料：各年度清洗後資料集，只保留案件層級欄位，並移除互資訊過濾判定無關的 `LOW_MI_COLS`。
+    2. 切分資料：依 year × severity 分層切成 train / validate / test(0.7 / 0.2 / 0.1)。
+        - 訓練集再欠採樣成多個子集 (A1:A2 = 1:`SAMPLE_FOLD`，預設 1:5)，目前只用第 `SUBSET_INDEX` 個(預設第 0 個)。
+        - validate、test 不欠採樣，維持原始比例；test 在這一步不使用，留給 `evaluate.py`。
+    3. 訓練模型：One-Hot 編碼規則以完整訓練集決定，邏輯斯迴歸以欠採樣子集配適，並檢查迭代次數是否達 `max_iter` 上限(是否收斂)。
+    4. 評估模型：只在 validate 計算 PR-AUC、recall、precision、F1、F2(切點見 `evaluate.THRESHOLD`)，作為比較、挑選版本的依據(見評估階段)。
+    5. 輸出結果：存至 `models/`，檔名加上 UTC 時戳(例如 `severity_20260928T122347Z`)，每次訓練不互相覆蓋。
+        - 模型檔 `.joblib`：整個 Pipeline(編碼規則 + 模型)，載入後可直接對原始 DataFrame 預測，提供 `evaluate.py`、`predictor.py` 使用。
+        - 勝算比表 `_odds_ratio.csv`：每列為一個 One-Hot 類別的係數與勝算比，執行完會印出前 20 名。
+        - 訓練紀錄：附加一筆至 `models/metadata.json`(見評估階段)。
+
+    | 目標 | 模型 | 係數解讀 |
+    |---|---|---|
+    | severity(A1 = 1)[已實作] | `LogisticRegression(max_iter=1000)`(solver=lbfgs，L2 正則化 C=1，皆為 sklearn 預設)；訓練集欠採樣為 A1:A2 = 1:5，不另外加權 | exp(係數) = 勝算比，例如「無號誌時發生 A1 的勝算是有號誌的 N 倍」 |
+    | injured_num [待實作] | `PoissonRegressor(alpha=1e-4)`；只取受傷 ≥ 1 人的案件，預測 `injured_num − 1` | exp(係數) = 額外受傷人數的倍率 |
+
+    - 要點 1：One-Hot 會明確指定參考類別(例如 weather=sunny、light=natural、rd_signals=signals)，係數都是「相對於參考類別」。
+    - 要點 2：`split_with_undersampling()` 回傳 (完整訓練集, 訓練子集 list, 驗證集, 測試集)。One-Hot 編碼規則以完整訓練集決定；模型以 `train_subsets[SUBSET_INDEX]`(預設第 0 個)訓練。
+    - 要點 3：sklearn 版本不同時預設值可能改變(例如 1.9 起 `penalty` 已棄用，改由 `l1_ratio` 控制，`l1_ratio=0` 即 L2)，實際使用的全部超參數與 sklearn 版本會記錄在訓練紀錄中。
 
 ### 評估階段
-7. `train.py` 於保留的測試集上計算評估指標（如準確率、F1-score、混淆矩陣），連同訓練資料版本、使用的特徵一併寫入 `models/metadata.json`，作為不同版本模型的比較依據。
-8. 手動執行 `python -m src.visualization.plots` 產出對應圖表（如混淆矩陣熱圖、PCA 投影圖、特徵重要性圖），輔助人工判斷這次訓練出的模型是否可以取代目前使用中的版本。
-9. 人工比對新舊模型的評估指標與圖表後，決定是否手動將新模型標記為採用版本（例如更新 `metadata.json` 中的 active 版本欄位）。
+
+6. `train.py` 訓練完會在 validate 上評估，並附加一筆訓練紀錄至 `models/metadata.json`，供比較不同版本。
+    - 訓練紀錄：資料設定(年度、切分比例、亂數種子、欠採樣、移除欄位、筆數)、特徵與參考類別、產出檔名、全部超參數與 sklearn 版本、是否收斂、validate 指標。
+    - 收斂：迭代次數達 `max_iter` 上限代表未收斂，係數與勝算比可能不準確。
+    - 指標選用
+        - severity 指標：全部猜 A2 就有 99.5% 準確率，所以不看 accuracy，改看 PR-AUC(與亂猜 ≈ A1 占比比較)、recall、precision、F1、F2(recall 權重較高)、混淆矩陣。
+        - 切點：`THRESHOLD` = 0.65，依 validate 掃描決定(F1 在 0.60~0.71 接近最大)，不可依 test 回頭調整；比較版本時需使用相同切點。欠採樣會使預測機率偏高。
+        - injured_num 指標：Poisson deviance、D²，與只猜平均值比較。
+7. 人工比對各版本的 validate 指標，決定要採用的版本。
+8. 版本定案後執行 evaluate，在 test 上評估一次，結果寫回該筆紀錄的 `metrics.test`(會依紀錄的設定重建相同的測試集)。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.training.evaluate 20260928T122347Z
+    ```
+    - 每筆紀錄只能評估一次；確定要重新評估才加 `--force`，會覆蓋原本的 test 指標。
+        ``` Anaconda Prompt
+        (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.training.evaluate 20260928T122347Z --force
+        ```
+9. 確認 test 指標後執行 promote，將該版本登錄為採用版本，寫入 `registry/manifest.json`。
+    ``` Anaconda Prompt
+    (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.training.promote 20260928T122347Z
+    ```
+    - `manifest.json` 入 git，只記錄各 target 目前採用的版本，改版歷程可由 git 追溯；完整訓練紀錄在 `models/metadata.json`(不入 git)。
+    - 尚未在 test 評估、或本機沒有模型檔時會拒絕登錄。
 
 ### 推論階段
-10. 其他 py 檔案透過以下方式複用目前採用中的模型（`predictor.py` 尚未實作）：
+10. 其他 py 檔案透過以下方式複用目前採用中的模型(`predictor.py` 尚未實作)：
     ```python
     from traffic_accident_ml.src.predictor import load_model, predict
 
     model = load_model()
     result = predict(model, df)
     ```
+    - `load_model()` 預計讀取 `registry/manifest.json` 取得採用版本，再從 `models/` 載入對應的模型檔。
+    - `predict_proba` 的第 2 欄為 A1 的機率。訓練集經欠採樣，機率會高於實際 A1 發生率，適合用於排序風險高低，不宜直接解讀為發生機率。
