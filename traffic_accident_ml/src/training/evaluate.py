@@ -1,7 +1,7 @@
 """
 評估指標(evaluate.py)
 - 不使用 accuracy：全部猜 A2 就有 99.5% 準確率
-- severity：PR-AUC(average_precision_score)、recall、precision、混淆矩陣；對照基準為 A1 占比
+- severity：PR-AUC(average_precision_score)、recall、precision、F1、F2、混淆矩陣；對照基準為 A1 占比
 - 測試集評估：版本定案後才以此入口在 test 評估一次，結果寫回該筆訓練紀錄
     - 每筆紀錄只評估一次，已有 test 指標時拒絕執行，避免反覆看 test 分數調參
     - 依紀錄中的年度、切分比例、亂數種子、移除欄位重建相同的測試集
@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import joblib
 import numpy as np
 from sklearn.metrics import (
-    average_precision_score, confusion_matrix,
+    average_precision_score, confusion_matrix, f1_score, fbeta_score,
     precision_score, recall_score, roc_auc_score,
 )
 
@@ -24,8 +24,10 @@ from src.data_management.common import load_json_record, save_json_record
 from src.preprocessing.loader import DEFAULT_YEARS, get_ds_with_adjusted_cols, split_by_year_severity
 from src.preprocessing.target import build_xy
 
-#--預測機率 ≥ 此值判為 A1
-THRESHOLD = 0.5
+#--預測機率大於等於此值時，判為 A1
+#--依 20260928T081841Z 在 validate 掃描切點決定：F1 在 0.60~0.71 接近最大，取 0.65 保留較多 recall
+#--切點只能依 validate 調整，不可依 test 結果回頭修改
+THRESHOLD = 0.65
 
 
 def severity_metrics(y, proba, threshold=THRESHOLD):
@@ -40,6 +42,9 @@ def severity_metrics(y, proba, threshold=THRESHOLD):
         "threshold": threshold,
         "recall": float(recall_score(y, pred, zero_division=0)),
         "precision": float(precision_score(y, pred, zero_division=0)),
+        #--F1：recall 與 precision 的調和平均；F2：recall 權重為 precision 的 2 倍，漏判 A1 代價較高時參考
+        "f1": float(f1_score(y, pred, zero_division=0)),
+        "f2": float(fbeta_score(y, pred, beta=2, zero_division=0)),
         "confusion_matrix": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
     }
 
@@ -76,7 +81,8 @@ def evaluate_test(timestamp, force=False):
     model = joblib.load(MODELS_DIR / record["model_file"])
     metrics = severity_metrics(y_te, model.predict_proba(X_te)[:, 1])
     print(f"[severity] test PR-AUC={metrics['average_precision']:.4f}(亂猜≈{metrics['baseline_average_precision']:.4f})，"
-          f"recall={metrics['recall']:.3f}，precision={metrics['precision']:.3f}")
+          f"recall={metrics['recall']:.3f}，precision={metrics['precision']:.3f}，"
+          f"F1={metrics['f1']:.3f}，F2={metrics['f2']:.3f}")
 
     #--寫回訓練紀錄：test 指標、測試集筆數、評估時間
     record["metrics"]["test"] = metrics

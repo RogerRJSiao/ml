@@ -7,7 +7,7 @@
        - 訓練集再欠採樣成多個子集(A1:A2 = 1:SAMPLE_FOLD)，先只用第 SUBSET_INDEX 個
        - validate、test 不欠採樣，維持原始比例
     3. 訓練模型：One-Hot 編碼規則以完整訓練集決定，邏輯斯迴歸以欠採樣子集配適
-    4. 評估模型：只在 validate 計算 PR-AUC、recall、precision(切點 0.5)，作為比較、挑選版本的依據
+    4. 評估模型：只在 validate 計算 PR-AUC、recall、precision、F1、F2(切點見 evaluate.THRESHOLD)，作為比較、挑選版本的依據
        - test 不在訓練時使用，避免調參時偷看；版本定案後以 evaluate.py 評估一次
     5. 輸出結果：模型(.joblib)、勝算比表(.csv)存至 models/，訓練紀錄附加至 models/metadata.json
 
@@ -93,7 +93,7 @@ def train_severity(splits, stamp, sampling):
     #--驗證集指標：PR-AUC 與亂猜(≈ A1 占比)比較
     v = metrics["validate"]
     log(f"[severity_evaluating] validate PR-AUC={v['average_precision']:.4f}(亂猜≈{v['baseline_average_precision']:.4f})，"
-        f"recall={v['recall']:.3f}，precision={v['precision']:.3f}")
+        f"recall={v['recall']:.3f}，precision={v['precision']:.3f}，F1={v['f1']:.3f}，F2={v['f2']:.3f}")
 
     #-- 5. 輸出結果
     table = severity_model.odds_ratio_table(model, X_tr, y_tr)
