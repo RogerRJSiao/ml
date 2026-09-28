@@ -48,33 +48,39 @@
 ```
 traffic_accident_ml/
 ├── data/
+│   ├── on_hold/                # 暫不使用的原始 zip，要納入時移到 incoming/
 │   ├── incoming/               # 下載、待解壓縮的原始 zip
 │   ├── raw/Y<yyyy>/            # extractor.py 解壓縮出的逐年 csv 原始檔
 │   └── processed/
 │       ├── merged_years/       # merger.py 產出的年度匯總檔
-│       └── cleaned/            # 未來欄位層級跨年度清洗完成的資料集
+│       └── cleaned/            # cleaner.py 產出的逐年清洗檔
 ├── registry/
 │   ├── extracted_zips.json     # extractor.py 記錄已解壓縮 zip 的 sha256，避免重複解壓
 │   ├── merged_years.json       # merger.py 記錄各年度來源檔案的 sha256，避免重複合併
-│   └── history/                # 每次執行 check_update.py 的比對紀錄
-├── models/                     # 訓練完成的模型檔與 metadata.json
+│   ├── cleaned_years.json      # cleaner.py 記錄各年度來源檔 sha256 與清洗前後列數，避免重複清洗
+│   └── manifest.json           # promote.py 登錄各 target 目前採用的模型版本
+├── models/                     # 訓練產出：模型檔 .joblib、勝算比表 .csv、所有訓練紀錄
 ├── environment.yml             # conda 環境定義
 └── src/
-    ├── schema.py                    # 固定欄位 schema 定義（50+ 欄位），供 loader.py 驗證用
     ├── data_management/
     │   ├── common.py                # 共用工具
     │   ├── extractor.py             # 解壓縮年別 zip
-    │   ├── merger.py                # 合併年別 csv
-    │   └── check_update.py          # 彙整匯入 pipeline 各年度完成到哪個階段的報表
+    │   ├── merger.py                # 合併年度彙總檔 csv
+    │   ├── cleaner.py               # 清洗後年度匯總檔 csv
+    │   └── cleaning_rules.py        # 清洗規則
     ├── preprocessing/
-    │   └── loader.py                # 讀取多年度 csv、依 schema 驗證，合併成單一 DataFrame
+    │   ├── loader.py                # 資料載入、資料集切分(訓練集、訓練子集、驗證集、測試集)
+    │   ├── encoding.py              # One-Hot 編碼，明確指定各欄參考類別
+    │   └── target.py                # 定義目標 y 與不列入特徵的欄位，組出訓練用 X、y
     ├── features/
-    │   └── pca.py                   # sklearn PCA 封裝：fit / transform / 匯出
+    │   └── filter_selection.py      # 互資訊(MI)過濾法篩選欄位
     ├── training/
-    │   └── train.py                 # loader -> 前處理 -> (PCA) -> 監督式學習模型 -> 匯出至 models/
-    ├── visualization/
-    │   └── plots.py                 # 可視化 pipeline：資料分布圖、PCA 投影圖、特徵重要性等
-    └── predictor.py                 # 對外唯一入口，供其他 py 檔案 import 使用訓練完成的模型
+    │   ├── train.py                 # loader -> One-Hot -> 可解釋線性模型 -> 匯出至 models/
+    │   ├── severity_model.py        # [已實作] 分類問題：Logistic 迴歸 → 勝算比
+    │   ├── injury_model.py          # [待實作] 迴歸問題：Poisson 迴歸 → 受傷人數倍率
+    │   ├── evaluate.py              # 評估指標實作(驗證集、測試集)；版本定案後評估(測試集)
+    │   └── promote.py               # 登錄採用版本至 registry/manifest.json
+    └── predictor.py                 # [待實作] 對外唯一入口，供其他 py 檔案 import 使用訓練完成的模型
 ```
 
 ## 環境建置 🛠️
@@ -151,7 +157,7 @@ traffic_accident_ml/
 9. 人工比對新舊模型的評估指標與圖表後，決定是否手動將新模型標記為採用版本（例如更新 `metadata.json` 中的 active 版本欄位）。
 
 ### 推論階段
-10. 其他 py 檔案透過以下方式複用目前採用中的模型：
+10. 其他 py 檔案透過以下方式複用目前採用中的模型（`predictor.py` 尚未實作）：
     ```python
     from traffic_accident_ml.src.predictor import load_model, predict
 
