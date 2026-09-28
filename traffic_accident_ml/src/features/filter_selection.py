@@ -11,27 +11,8 @@ from scipy.stats import chi2, entropy
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.preprocessing import OrdinalEncoder
 
-from src.data_management.cleaning_rules import (
-    CASE_RENAME,
-    COL_SEVERITY, COL_YEAR, COL_DEAD_NUM, COL_INJURED_NUM,
-)
-
 from src.preprocessing.loader import get_ds_with_adjusted_cols, split_by_year_severity
-
-#--目標欄位與正類標籤
-TARGET_COL = CASE_RENAME[COL_SEVERITY]
-POSITIVE_LABEL = "A1"
-#--不列入特徵的欄位：目標、切分用年度、死傷人數（A1 依死亡定義，屬目標洩漏）
-EXCLUDE_COLS = [CASE_RENAME[c] for c in (COL_SEVERITY, COL_YEAR, COL_DEAD_NUM, COL_INJURED_NUM)]
-
-
-def build_xy(df):
-    """拆出特徵 X 與目標 y（A1 為 1，其餘為 0）"""
-    #--指定X
-    X = df.drop(columns=EXCLUDE_COLS)
-    #--指定y
-    y = (df[TARGET_COL] == POSITIVE_LABEL).astype(int)
-    return X, y
+from src.preprocessing.target import POSITIVE_LABEL, TARGET_COL, build_xy
 
 
 def mutual_info_ranking(X, y):
