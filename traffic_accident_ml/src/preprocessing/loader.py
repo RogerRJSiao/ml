@@ -1,4 +1,9 @@
-"""讀取多年度事故資料 csv，依 schema.py 驗證欄位，合併成單一 DataFrame。"""
+"""
+資料載入(loader.py)
+讀取各年度清洗後的事故資料 csv，
+依 cleaning_rules 篩選欄位，並依年度 × 嚴重度分層切分 train/validate/test。
+
+"""
 
 import pandas as pd
 
@@ -19,7 +24,7 @@ CLEANED_DIR = BASE_DIR / "data" / "processed" / "cleaned"
 #--預設載入的西元年度
 DEFAULT_YEARS = (2020, 2021, 2022)
 #--資料子集分配比例、亂數種子
-SPLIT_RATIOS = (0.7, 0.2, 0.1)  #--訓練、驗證、測試
+SPLIT_RATIO_TRAIN_TO_TEST = (0.7, 0.2, 0.1)  #--訓練、驗證、測試
 RANDOM_STATE = 42               #--固定亂數種子，每次執行切出來的結果都一樣
 #--過濾法(filter_selection.py)判定與 y 無顯著關聯的欄位：互資訊落在雜訊範圍、G 檢定 p 值 > 0.01
 LOW_MI_COLS = [CASE_RENAME[c] for c in (COL_RD_SURFACE, COL_RD_SLIPPERY, COL_RD_DEFECT, COL_RD_OBSTACLE)]
@@ -64,7 +69,7 @@ def get_ds_with_adjusted_cols():
     # df.info()
     return df
 
-def split_by_year_severity(df, ratios=SPLIT_RATIOS, random_state=RANDOM_STATE, drop_cols=None):
+def split_by_year_severity(df, ratio_train_to_test=SPLIT_RATIO_TRAIN_TO_TEST, random_state=RANDOM_STATE, drop_cols=None):
     """
     拆分資料集
     - 依 year × severity 分組，各組各自打亂後按比例切成訓練、驗證、測試子集，再合併
@@ -85,19 +90,42 @@ def split_by_year_severity(df, ratios=SPLIT_RATIOS, random_state=RANDOM_STATE, d
         #--取出 100% 資料比數，打亂順序，減少日期排序影響結果
         g = g.sample(frac=1, random_state=random_state)
         #--訓練集先拿 0.7、驗證集再拿 0.2，最後剩餘的都歸測試集(原定0.1)
-        n_train = round(len(g) * ratios[0])
-        n_validate = round(len(g) * ratios[1])
+        n_train = round(len(g) * ratio_train_to_test[0])
+        n_validate = round(len(g) * ratio_train_to_test[1])
         train.append(g.iloc[:n_train])
         validate.append(g.iloc[n_train:n_train + n_validate])
         test.append(g.iloc[n_train + n_validate:])
     return tuple(pd.concat(parts).drop(columns=drop_cols) for parts in (train, validate, test))
 
+def split_with_undersampling(df, sample_fold=5, ratio_train_to_test=SPLIT_RATIO_TRAIN_TO_TEST, random_state=RANDOM_STATE, drop_cols=None):
+    """
+    欠採樣(undersampling)
+    - 將 split_by_year_severity 的訓練集細分成多個子集，A1:A2 = 1:sample_fold。
+    - 每個訓練子集資料數 = 全部 A1 + a2_subset_max 筆 A2。A2 不分年度打亂後依序切段，子集之間不重複。
+    - 只調整訓練子集的資料，驗證集、測試集維持原始樣本分配。
+    - 可能延伸：集成學習(ensemble learning)
+    """
+    #--取出已分好訓練集/驗證集/測試集
+    train, validate, test = split_by_year_severity(df, ratio_train_to_test, random_state, drop_cols)
+    #--重新打亂訓練集的A2資料，再分配到訓練子集(subset)
+    #--最後一組訓練子集的A2，若無法湊滿，將不使用。
+    is_a1 = train[CASE_RENAME[COL_SEVERITY]] == "A1"
+    a1 = train[is_a1]
+    a2 = train[~is_a1].sample(frac=1, random_state=random_state)
+    a2_subset_max = len(a1) * sample_fold
+    train_subsets = [pd.concat([a1, a2.iloc[i:i + a2_subset_max]])
+                     for i in range(0, len(a2) - a2_subset_max + 1, a2_subset_max)]
+    return train_subsets, validate, test
+
 if __name__ == "__main__":
     df_ori = get_ds_with_adjusted_cols()
     # df_train, df_validate, df_test = split_by_year_severity(df_ori, drop_cols=None)
-    df_train, df_validate, df_test = split_by_year_severity(df_ori, drop_cols=LOW_MI_COLS)
-    # df_test.info()
+    # df_train, df_validate, df_test = split_by_year_severity(df_ori, drop_cols=LOW_MI_COLS)
+    df_train, df_validate, df_test = split_with_undersampling(df_ori, sample_fold=3, drop_cols=LOW_MI_COLS)
+    df_train[0].info()
+    print(len(df_train))
     #--檢查各子集的年度 × 事故類別筆數
-    for name, d in (("train", df_train), ("validate", df_validate), ("test", df_test)):
+    for name, d in (("train", df_train[0]), ("validate", df_validate), ("test", df_test)):
         print(f"--- {name}: {len(d)} 筆")
+        #--顯示樞紐表：年別 × 嚴重度
         print(pd.crosstab(d[CASE_RENAME[COL_YEAR]], d[CASE_RENAME[COL_SEVERITY]]))
