@@ -1,1 +1,6 @@
-{}
+{
+  "severity": {
+    "timestamp": "20260928T122347Z",
+    "model_file": "severity_20260928T122347Z.joblib"
+  }
+}
