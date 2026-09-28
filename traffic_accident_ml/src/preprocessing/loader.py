@@ -103,6 +103,7 @@ def split_with_undersampling(df, sample_fold=5, ratio_train_to_test=SPLIT_RATIO_
     - 將 split_by_year_severity 的訓練集細分成多個子集，A1:A2 = 1:sample_fold。
     - 每個訓練子集資料數 = 全部 A1 + a2_subset_max 筆 A2。A2 不分年度打亂後依序切段，子集之間不重複。
     - 只調整訓練子集的資料，驗證集、測試集維持原始樣本分配。
+    - 回傳 (完整訓練集, 訓練子集 list, 驗證集, 測試集)；完整訓練集可用來決定 One-Hot 編碼規則
     - 可能延伸：集成學習(ensemble learning)
     """
     #--取出已分好訓練集/驗證集/測試集
@@ -115,17 +116,17 @@ def split_with_undersampling(df, sample_fold=5, ratio_train_to_test=SPLIT_RATIO_
     a2_subset_max = len(a1) * sample_fold
     train_subsets = [pd.concat([a1, a2.iloc[i:i + a2_subset_max]])
                      for i in range(0, len(a2) - a2_subset_max + 1, a2_subset_max)]
-    return train_subsets, validate, test
+    return train, train_subsets, validate, test
 
 if __name__ == "__main__":
     df_ori = get_ds_with_adjusted_cols()
     # df_train, df_validate, df_test = split_by_year_severity(df_ori, drop_cols=None)
     # df_train, df_validate, df_test = split_by_year_severity(df_ori, drop_cols=LOW_MI_COLS)
-    df_train, df_validate, df_test = split_with_undersampling(df_ori, sample_fold=3, drop_cols=LOW_MI_COLS)
-    df_train[0].info()
-    print(len(df_train))
+    df_train_full, train_subsets, df_validate, df_test = split_with_undersampling(df_ori, sample_fold=3, drop_cols=LOW_MI_COLS)
+    train_subsets[0].info()
+    print(len(train_subsets))
     #--檢查各子集的年度 × 事故類別筆數
-    for name, d in (("train", df_train[0]), ("validate", df_validate), ("test", df_test)):
+    for name, d in (("train", train_subsets[0]), ("validate", df_validate), ("test", df_test)):
         print(f"--- {name}: {len(d)} 筆")
         #--顯示樞紐表：年別 × 嚴重度
         print(pd.crosstab(d[CASE_RENAME[COL_YEAR]], d[CASE_RENAME[COL_SEVERITY]]))
