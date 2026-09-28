@@ -7,9 +7,13 @@ data/raw/**
 data/incoming/**
 !data/incoming/.gitkeep
 
-# 訓練產出的模型檔不入庫，只保留資料夾結構 (.gitkeep)
-models/*.joblib
-models/*.pkl
+# 暫不使用的原始 zip 不入庫，只保留資料夾結構 (.gitkeep)
+data/on_hold/**
+!data/on_hold/.gitkeep
+
+# 訓練產出的模型檔、係數表、訓練紀錄不入庫，只保留資料夾結構 (.gitkeep)
+models/*
+!models/.gitkeep
 
 # 每次 check_update 的比對紀錄不入庫，只保留資料夾結構 (.gitkeep)
 registry/history/*
