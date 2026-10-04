@@ -1,8 +1,25 @@
 # 交通事故嚴重程度預測與高風險情境分析 🚗🛞
 
-透過台灣歷年交通事故的公開資料，可用資料欄位包括天候、光線、道路型態、號誌、肇因、當事者屬性、經緯度等，實作歸檔管理、機器學習、可視化 pipeline 功能。
+## 1. 專案概述 📌
 
-## 原始資料來源 💾
+這個專案使用台灣歷年交通事故的公開資料，資料欄位包括天候、光線、道路型態、號誌、肇因、當事者屬性和經緯度等，實作歸檔管理、機器學習和可視化 pipeline。
+
+**做了什麼**
+- 資料管理：把逐年公開的 zip 依序解壓縮、合併成年度匯總檔、清洗後歸檔。每個步驟都用 sha256 記錄處理狀態，避免重複處理。
+- 嚴重程度模型：用 Logistic 迴歸預測一件事故是 A1（死亡）還是 A2（受傷），並把係數換算成勝算比，找出高風險情境。
+- 版本管理：訓練、評估、登錄採用版本三個步驟分開執行，每次訓練的設定和指標都留有紀錄。
+
+**主要技術**
+
+| 類別 | 技術 |
+| --- | --- |
+| 語言 / 環境 | Python 3.12、Anaconda（conda-forge） |
+| 資料處理 | pandas |
+| 機器學習 | scikit-learn（LogisticRegression、PoissonRegressor (todo)、One-Hot 編碼、互資訊特徵篩選）、joblib |
+| 可視化 (todo) | matplotlib、seaborn |
+| 版本追蹤 | sha256 處理紀錄（`registry/*.json`）、訓練紀錄（`models/metadata.json`）、採用版本登錄（`registry/manifest.json`） |
+
+### 原始資料來源 💾
 
 | 資料集名稱 | 檔案類型 | 初次上架日 | 備註 |
 | --- | --- | --- | --- |
@@ -15,7 +32,13 @@
 | [即時交通事故資料 (A1類)(json格式)](https://data.gov.tw/dataset/57023) | json | 2017-10-17 | 持續更新，僅列當年度 |
 | [即時交通事故資料 (A2類)(json格式)](https://data.gov.tw/dataset/57024) | 單一zip打包單一json | 2017-10-17 | 持續更新，僅列當年度 |
 
-### A1 類/ A2 類交通事故的資料欄位 (50 欄)
+> 台灣交通事故等級判定
+> - A1 類：造成人員當場或 24 小時內死亡之交通事故。
+> - A2 類：造成人員受傷或超過 24 小時死亡之交通事故。
+> - A3 類：指僅有車輛財物受損之交通事故。(由於資料不完整，故本專案暫不列入)
+
+<details>
+<summary><b>A1 類/ A2 類交通事故的資料欄位 (50 欄)</b></summary>
 
 **時間資訊**
 發生年度、發生月份、發生日期、發生時間
@@ -38,12 +61,61 @@
 **傷亡結果與地理位置**
 死亡受傷人數、經度、緯度
 
-> 台灣交通事故等級判定
-> - A1 類：造成人員當場或 24 小時內死亡之交通事故。
-> - A2 類：造成人員受傷或超過 24 小時死亡之交通事故。
-> - A3 類：指僅有車輛財物受損之交通事故。(由於資料不完整，故本專案暫不列入)
+</details>
 
-## 資料夾架構 📂
+## 2. 問題與動機 🎯
+
+**為什麼要做**
+- **找出高風險情境**：同樣是交通事故，有些會造成死亡（A1），大多數只有受傷（A2）。這個專案想知道天候、光線、道路型態、號誌、時段等條件中，哪些會明顯提高事故變成 A1 的機會，作為交通安全改善的參考。
+- **練習完整的 ML 流程**：不只訓練一個模型，而是從公開資料下載、清洗、特徵篩選、建模、評估，一路做到版本登錄和對外提供模型。
+
+**原本的痛點**
+- 公開資料按年度分開發布，每年是一個 zip 包多個 csv，而且每個 csv 檔尾都有說明註解列，無法直接合併分析。
+- 原始資料每一列是一位當事者，不是一件事故，要先整理成案件層級才能建模。
+- 資料每年都會新增；如果每次都從頭重跑，很難知道哪些年度處理過、清洗規則改了之後哪些要重做，也很難確認清洗過程有沒有漏掉資料。
+- A1 只占約 0.5%，全部猜 A2 就有 99.5% 準確率，所以準確率不能拿來判斷模型好壞。
+
+## 3. 解決方案 💡
+
+1. **可重複、可追溯的資料 pipeline**：解壓縮、合併、清洗分成三支程式，每一步都把來源檔的 sha256 記錄在 `registry/`，來源沒有變就略過。清洗規則有修改時用 `--force` 指定年度重做，並用列數等式驗證沒有資料遺漏或重複。
+2. **可解釋的線性模型**：不追求黑箱模型的分數，改用 Logistic 迴歸（severity）和 Poisson 迴歸（injured_num），把係數換成勝算比或倍率，直接回答「某條件下發生 A1 的勝算是參考類別的幾倍」。
+3. **針對不平衡資料的訓練和評估**：訓練集欠採樣，評估改看 PR-AUC、recall、precision、F1、F2，切點從 validate 掃描決定，test 只在版本定案後使用一次。
+4. **手動把關的版本管理**：train → evaluate → promote 三步分開執行，每一步都要人工確認，採用版本登錄在 `registry/manifest.json`，之後由 `predictor.py` 作為對外唯一的入口。
+
+## 4. 系統架構 / Workflow 🧭
+
+> 以下皆為手動觸發，暫時沒有排程或自動化機制；每一階段都需要人工確認後才執行下一步。🤚
+
+**① 資料管理（`src/data_management/`）**
+
+```mermaid
+flowchart LR
+    A["data/incoming/<br/>年度 zip"] -->|extractor.py| B["data/raw/Y&lt;yyyy&gt;/<br/>逐年 csv"]
+    B -->|merger.py| C["merged_years/<br/>年度匯總檔"]
+    C -->|"cleaner.py<br/>cleaning_rules.py"| D["cleaned/<br/>案件層級清洗檔"]
+    R[("registry/<br/>sha256、列數紀錄")] -.-> A & B & C
+```
+
+**② 訓練與部署（`src/preprocessing/`、`src/training/`、`src/predictor.py`）**
+
+```mermaid
+flowchart LR
+    D["cleaned/<br/>案件層級清洗檔"] -->|"loader.py<br/>分層切分 + 欠採樣"| E["train / validate<br/>/ test"]
+    E -->|"train.py<br/>One-Hot + Logistic 迴歸"| G["models/<br/>模型檔、勝算比表<br/>訓練紀錄"]
+    G -->|"evaluate.py：test 評估<br/>promote.py：登錄版本"| I["registry/<br/>manifest.json"]
+    I --> J["predictor.py<br/>對外入口"]
+```
+
+| 元件 | 資料夾 | 職責 |
+| --- | --- | --- |
+| 資料管理 | `src/data_management/` | 解壓縮、合併、清洗年度資料，記錄處理狀態 |
+| 前處理 | `src/preprocessing/` | 載入資料、切分資料集、One-Hot 編碼、組出 X、y |
+| 特徵篩選 | `src/features/` | 用互資訊（MI）過濾無關欄位 |
+| 訓練與版本管理 | `src/training/` | 訓練、評估、登錄採用版本 |
+| 推論 | `src/predictor.py` (todo)| 讀取採用版本，供其他程式 import 使用 |
+| 紀錄 | `registry/`、`models/metadata.json` | 處理狀態、訓練紀錄、採用版本 |
+
+### 資料夾架構 📂
 
 ```
 traffic_accident_ml/
@@ -83,7 +155,9 @@ traffic_accident_ml/
     └── predictor.py                 # [待實作] 對外唯一入口，供其他 py 檔案 import 使用訓練完成的模型
 ```
 
-## 環境建置 🛠️
+## 5. 技術實作 🛠️
+
+### 環境建置
 
 1. 安裝 [Anaconda](https://www.anaconda.com/download) 。
     - 本專案只使用 Anaconda 管理虛擬環境與套件。
@@ -104,39 +178,6 @@ traffic_accident_ml/
     (traffic_ml) D:\your-project\traffic_accident_ml>python -m src.data_management.cleaner
     ```
     - 若在不正確的位置，讓程式使用相對匯入的話，通常會出現 `ImportError` 或 `ModuleNotFoundError: No module named 'src'` 的報錯。
-
-## 資料 pipeline 正確性驗證 ✅
-
-### 資料清洗 (powered by cleaner.py)
-
-> 每當清洗一個年度，會把前後的列數記錄到 `registry/cleaned_years.json`，可以拿來確認每一份原始資料列的篩除/保留原因。
-
-| key | 說明 |
-|---|---|
-| `input_row_count` | 讀入年度匯總檔（`merged_years/`）的原始列數 |
-| `footer_rows_dropped` | 刪除的檔尾說明註解資料列。每年度由 13 份檔案彙總，故通常為 26 列的無用資料。 |
-| `removed_counts` | 因「資料異常」或「研究目的」調整資料集，移除的列數明細都儲存於 `*_removed.csv` |
-| `output_row_count` | 輸出 `*_cleaned.csv` 的列數（單一案件合併成一列） |
-
-- **驗證規則**：原始資料列每列都是一位當事者，資料清洗過程只保留順位 1、2，並把兩位當事者合併成一列，因此輸出一列相當於兩列原始資料。
-    ```
-    input_row_count = footer_rows_dropped + Σ removed_counts + 2 × output_row_count
-    ```
-- 要點 1：等號兩邊不相等，代表有資料在清洗過程中遺漏或重複計算。
-- 要點 2：`Σ removed_counts` 應等於 `*_removed.csv` 的列數，而 `output_row_count` 應等於 `*_cleaned.csv` 的列數。
-
-- 驗證結果範例
-
-    | 年度 | input_row_count | footer_rows_dropped | Σ removed_counts | output_row_count | 差額 |
-    |---|---|---|---|---|---|
-    | 2020 | 817,375 | 26 | 103,737 | 356,806 | 0 |
-    | 2021 | 804,394 | 26 | 99,952 | 352,208 | 0 |
-    | 2022 | 845,572 | 26 | 104,054 | 370,746 | 0 |
-
-
-## 模型開發與部署規畫
-
-> 以下皆為手動觸發，暫時沒有排程或自動化機制；每一階段都需要人工確認後才執行下一步。🤚
 
 ### 資料前處理
 1. 下載並將各年度原始資料 zip 放入 `data/incoming/`。
@@ -224,3 +265,126 @@ traffic_accident_ml/
     ```
     - `load_model()` 預計讀取 `registry/manifest.json` 取得採用版本，再從 `models/` 載入對應的模型檔。
     - `predict_proba` 的第 2 欄為 A1 的機率。訓練集經欠採樣，機率會高於實際 A1 發生率，適合用於排序風險高低，不宜直接解讀為發生機率。
+
+## 6. 成果展示 📊
+
+目前採用版本：`severity_20260928T122347Z`（登錄於 `registry/manifest.json`）
+
+| 設定 | 內容 |
+| --- | --- |
+| 訓練年度 | 2020、2021、2022 |
+| 筆數 | 訓練子集 22,218（A1:A2 = 1:5）、驗證集 215,951、測試集 107,977 |
+| 特徵 | 17 欄（移除低互資訊欄位 `rd_surface`、`rd_slippery`、`rd_defect`、`rd_obstacle`） |
+| 模型 | `LogisticRegression`（lbfgs、L2、C=1），30 次迭代收斂，sklearn 1.9.1 |
+
+### 評估指標（切點 0.65）
+
+| 指標 | validate | test |
+| --- | --- | --- |
+| PR-AUC | 0.0285 | 0.0351 |
+| PR-AUC 基準（亂猜 ≈ A1 占比） | 0.0049 | 0.0049 |
+| ROC-AUC | 0.767 | 0.789 |
+| Recall | 0.147 | 0.160 |
+| Precision | 0.057 | 0.063 |
+| F1 | 0.083 | 0.091 |
+| F2 | 0.112 | 0.123 |
+
+test 混淆矩陣：
+
+| | 預測 A2 | 預測 A1 |
+| --- | --- | --- |
+| 實際 A2 | 106,190 | 1,257 |
+| 實際 A1 | 445 | 85 |
+
+- test 的 PR-AUC 約為亂猜基準的 7 倍，ROC-AUC 接近 0.79，模型能把 A1 案件排到較前面。
+- 但 recall 和 precision 都偏低：A1 本身極少，事故條件欄位能提供的區分能力有限。這個模型較適合用來排序風險和解讀高風險因子，不適合單獨用來判定個別案件。
+
+### 高風險情境：勝算比前 10 名
+
+勝算比是「相對於參考類別，發生 A1 的勝算是幾倍」。n、n_A1 為訓練子集中該類別的案件數和 A1 數。
+
+| 排名 | 欄位 | 類別 | 參考類別 | n | n_A1 | 勝算比 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | acc_type | vehicle_person（人與車） | two_vehicles | 1,396 | 546 | 4.41 |
+| 2 | rd_type | provincial（省道） | urban | 891 | 424 | 4.12 |
+| 3 | acc_subtype | head_on（對撞） | side | 261 | 108 | 3.64 |
+| 4 | acc_subtype | fixed_object（撞固定物） | side | 935 | 610 | 2.80 |
+| 5 | period | early_morning（清晨） | daytime | 889 | 320 | 2.53 |
+| 6 | rd_type | county（縣道） | urban | 1,234 | 376 | 2.37 |
+| 7 | acc_type | vehicle（單一車輛） | two_vehicles | 2,676 | 970 | 2.36 |
+| 8 | acc_subtype | run_off_road（衝出路外） | side | 210 | 128 | 2.00 |
+| 9 | city | 苗栗縣 | 桃園市 | 496 | 156 | 1.99 |
+| 10 | period | late_night（深夜） | daytime | 1,887 | 652 | 1.92 |
+
+完整表格見 `models/severity_20260928T122347Z_odds_ratio.csv`。
+
+## 7. 問題與解決方式 🔧
+
+### 問題 1：類別極度不平衡
+
+- **現象**：A1 只占約 0.5%，全部猜 A2 就有 99.5% 準確率。
+- **原因**：死亡事故本來就遠少於受傷事故。
+- **解決方式**
+    - 訓練集欠採樣為 A1:A2 = 1:5；validate、test 維持原始比例，評估結果才會反映真實情況。
+    - 不看 accuracy，改看 PR-AUC（和亂猜基準比較）、recall、precision、F1、F2 和混淆矩陣。
+    - 切點從 validate 掃描決定（F1 在 0.60~0.71 接近最大，取 0.65），test 只在版本定案後評估一次，避免依 test 回頭調整。
+    - 欠採樣會讓預測機率偏高，所以 `predict_proba` 只用來排序風險，不當成實際發生機率。
+
+### 問題 2：重複處理與可追溯性
+
+- **現象**：資料每年新增，清洗規則也會修改。如果每次都從頭重跑，很耗時，也無法確認哪些年度處理過、清洗過程有沒有漏掉或重複計算資料。
+- **原因**：原始資料分年、分檔發布，處理步驟多，每一步的輸入輸出都可能變動。
+- **解決方式**
+    - `registry/` 記錄每一步來源檔的 sha256，來源沒有變且輸出檔都在就略過(`[skip]`)。
+    - 只改清洗規則時來源檔不會變，用 `cleaner --force yyyy...` 指定年度重新清洗。
+    - 每次訓練都附加一筆紀錄到 `models/metadata.json`，採用版本登錄在 `registry/manifest.json`，可以由 git 追溯改版歷程。
+    - 用列數等式驗證清洗結果，說明如下。
+
+#### 資料清洗列數驗證 ✅ (powered by cleaner.py)
+
+> 每當清洗一個年度，會把前後的列數記錄到 `registry/cleaned_years.json`，可以拿來確認每一份原始資料列的篩除/保留原因。
+
+| key | 說明 |
+|---|---|
+| `input_row_count` | 讀入年度匯總檔（`merged_years/`）的原始列數 |
+| `footer_rows_dropped` | 刪除的檔尾說明註解資料列。每年度由 13 份檔案彙總，故通常為 26 列的無用資料。 |
+| `removed_counts` | 因「資料異常」或「研究目的」調整資料集，移除的列數明細都儲存於 `*_removed.csv` |
+| `output_row_count` | 輸出 `*_cleaned.csv` 的列數（單一案件合併成一列） |
+
+- **驗證規則**：原始資料列每列都是一位當事者，資料清洗過程只保留順位 1、2，並把兩位當事者合併成一列，因此輸出一列相當於兩列原始資料。
+    ```
+    input_row_count = footer_rows_dropped + Σ removed_counts + 2 × output_row_count
+    ```
+- 要點 1：等號兩邊不相等，代表有資料在清洗過程中遺漏或重複計算。
+- 要點 2：`Σ removed_counts` 應等於 `*_removed.csv` 的列數，而 `output_row_count` 應等於 `*_cleaned.csv` 的列數。
+
+- 驗證結果範例
+
+    | 年度 | input_row_count | footer_rows_dropped | Σ removed_counts | output_row_count | 差額 |
+    |---|---|---|---|---|---|
+    | 2020 | 817,375 | 26 | 103,737 | 356,806 | 0 |
+    | 2021 | 804,394 | 26 | 99,952 | 352,208 | 0 |
+    | 2022 | 845,572 | 26 | 104,054 | 370,746 | 0 |
+
+## 8. 學習與未來改進 🚀
+
+### 學到什麼
+- 不平衡資料不能只看 accuracy，要搭配 PR-AUC、recall、precision 和合適的切點，並嚴格區分 validate 和 test 的用途。
+- 可解釋模型的價值：勝算比可以直接回答「哪些情境比較危險」，比單一分數更容易拿來溝通。
+- 資料 pipeline 要能重跑、能略過、能驗證；用 sha256 和列數等式記錄處理狀態，比事後追查容易得多。
+- 把實際使用的超參數和套件版本寫進訓練紀錄，套件預設值改變時才能重現結果。
+
+### 目前還不完整
+- `injury_model.py`（Poisson 迴歸，預測受傷人數）尚未接入訓練。
+- `predictor.py` 尚未實作，其他程式還不能直接 import 使用採用中的模型。
+- 目前只用 2020~2022 年訓練；欠採樣產生 40 個子集，只用了第 0 個。
+- A3 類資料不完整，暫不列入。
+- 所有步驟都是手動觸發，沒有排程或自動化。
+- 可視化 pipeline 尚未完成。
+
+### 下一步
+- 完成 `injury_model.py` 和 `predictor.py`。
+- 納入 2023 年以後的資料重新訓練。
+- 用 2020~2022 年訓練集的全部 40 個欠採樣子集各自訓練模型，平均係數後得到集成模型，可用到全部 A2 資料、減少子集抽樣造成的結果波動，同時保留勝算比的解讀；並以係數在各子集間的分布評估勝算比是否穩定。
+- 加入勝算比圖表、事故經緯度地圖等可視化。
+- 評估是否加入排程，自動偵測新資料並執行前處理。
